@@ -79,13 +79,21 @@ export class BookingService {
         bookingData.foodCostTotal = totals.foodCostTotal;
 
         const advanceAmount = bookingData.payment?.advanceAmount ?? 0;
+        const discountAmount = bookingData.discount?.amount ?? 0;
 
+        // Store original total amount (DO NOT modify with discount)
         bookingData.payment = {
           ...bookingData.payment,
-          totalAmount: Number(totals.totalAmount),
+          totalAmount: Number(totals.totalAmount), // Keep original total
           advanceAmount: advanceAmount,
           paymentStatus: bookingData.payment?.paymentStatus ?? "unpaid",
           paymentMode: bookingData.payment?.paymentMode ?? "cash",
+        };
+
+        // Store discount separately (DO NOT modify totalAmount)
+        bookingData.discount = {
+          amount: discountAmount,
+          note: bookingData.discount?.note,
         };
       }
 
@@ -301,15 +309,25 @@ export class BookingService {
           0
         );
 
-        // Preserve existing payment details but update totalAmount
+        // Calculate raw total (original total - DO NOT apply discount here)
+        const rawTotalAmount = finalFoodCostTotal + servicesTotal;
+
+        // Store original total amount (DO NOT modify with discount)
         const currentPayment = currentBooking.payment || {};
         const updatePayment: any = updateData.payment || {}
 
         updateData.payment = {
-          totalAmount: finalFoodCostTotal + servicesTotal,
+          totalAmount: rawTotalAmount, // Keep original total
           advanceAmount: updatePayment.advanceAmount ?? currentPayment.advanceAmount ?? 0,
           paymentStatus: updatePayment.paymentStatus ?? currentPayment.paymentStatus ?? "unpaid",
           paymentMode: updatePayment.paymentMode ?? currentPayment.paymentMode ?? "cash",
+        };
+
+        // Store discount separately (DO NOT modify totalAmount)
+        const discountAmount = updateData.discount?.amount ?? (currentBooking as any).discount?.amount ?? 0;
+        updateData.discount = {
+          amount: discountAmount,
+          note: updateData.discount?.note ?? (currentBooking as any).discount?.note,
         };
       }
 

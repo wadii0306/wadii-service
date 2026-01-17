@@ -397,6 +397,16 @@ const bookingSchema = new Schema<
         // This represents the primary/default payment mode
       },
     },
+    discount: {
+      amount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      note: {
+        type: String,
+      },
+    },
     notes: {
       type: String,
       default: "",

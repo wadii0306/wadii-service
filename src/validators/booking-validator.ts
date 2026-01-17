@@ -109,6 +109,12 @@ export const createBookingSchema = z
         .enum(["cash", "card", "upi", "bank_transfer", "cheque", "other"])
         .default("cash"),
     }),
+    discount: z
+      .object({
+        amount: z.number().min(0, "Discount amount must be positive"),
+        note: z.string().optional(),
+      })
+      .optional(),
     notes: z.string().optional(),
     internalNotes: z.string().optional(),
   })
@@ -166,6 +172,12 @@ export const updateBookingSchema = z
         paymentMode: z
           .enum(['cash', 'card', 'upi', 'bank_transfer', 'cheque', 'other'])
           .optional(),
+      })
+      .optional(),
+    discount: z
+      .object({
+        amount: z.number().min(0, "Discount amount must be positive").optional(),
+        note: z.string().optional(),
       })
       .optional(),
     notes: z.string().optional(),
