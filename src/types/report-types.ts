@@ -46,6 +46,10 @@ export interface DebtorInfo {
   eventDate: Date;
   paymentMode: string;
   occasionType: string;
+  discount?: {
+    amount: number;
+    note?: string;
+  };
 }
 
 export interface CreditorInfo {
