@@ -113,6 +113,15 @@ const leadSchema = new Schema<ILead>(
       required: true,
       trim: true,
     },
+    remarks: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "LeadActivity",
+        required: false,
+        default: [],
+      },
+    ],
+
     contactNo: {
       type: String,
       required: true,

@@ -94,6 +94,7 @@ export interface ILead extends Document {
   }>;
   selectedMenu?: ISelectedMenuSection[];
   notes?: string;
+  remarks?: Types.ObjectId[];
   createdBy?: Types.ObjectId;
   updatedBy?: Types.ObjectId;
   lastModifiedBy?: Types.ObjectId;

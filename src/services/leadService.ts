@@ -61,13 +61,40 @@ export class LeadService {
       //   }
       // }
 
-      const lead = new Lead(leadData)
+      // Extract remarks from lead data before creating Lead
+      const { remarks, ...pureLeadData } = leadData as any;
+      const remarksData = remarks;
+
+      const lead = new Lead(pureLeadData)
       await lead.save()
+
+      // Create lead remarks if provided
+      let createdRemarks = [];
+      if (remarksData && Array.isArray(remarksData) && remarksData.length > 0) {
+        const { LeadActivity } = await import("../models/LeadRemark");
+        
+        const remarksToCreate = remarksData.map((remark: any) => ({
+          leadId: lead._id,
+          header: remark.header,
+          description: remark.description,
+          status: remark.status || 'pending',
+          outcome: remark.outcome,
+          followUpDate: remark.followUpDate ? new Date(remark.followUpDate) : undefined,
+          createdBy: pureLeadData.createdBy
+        }));
+
+        createdRemarks = await LeadActivity.insertMany(remarksToCreate);
+        
+        // Update lead with remark references
+        lead.remarks = createdRemarks.map(remark => remark._id);
+        await lead.save();
+      }
 
       await lead.populate([
         { path: 'venueId', select: ' venueType address' },
         { path: 'createdBy', select: '_id email firstName lastName' },
         { path: 'updatedBy', select: '_id email firstName lastName' },
+        { path: 'remarks', populate: { path: 'createdBy', select: '_id email firstName lastName' } }
       ])
 
       return lead
@@ -84,7 +111,8 @@ export class LeadService {
       const lead = await Lead.findById(oid(leadId))
         .populate("venueId", "venueName venueType address")
         .populate("createdBy", "_id email firstName lastName")
-        .populate("updatedBy", "_id email firstName lastName");
+        .populate("updatedBy", "_id email firstName lastName")
+        .populate("remarks", "header description status outcome followUpDate createdAt");
       return lead;
     } catch (error: any) {
       throw new Error(`Error fetching lead: ${error.message}`);

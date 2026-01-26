@@ -56,6 +56,17 @@ const serviceSchema = z.object({
 });
 
 /**
+ * Remark schema
+ */
+const remarkSchema = z.object({
+  header: z.string().min(1, "Header is required"),
+  description: z.string().min(1, "Description is required"),
+  status: z.enum(["pending", "completed", "cancelled"]).default("pending"),
+  outcome: z.enum(["interested", "not_interested", "follow_up_needed", "converted", "lost"]).optional(),
+  followUpDate: z.string().datetime().optional(),
+});
+
+/**
  * Create lead validation schema
  */
 export const createLeadSchema = z
@@ -74,6 +85,7 @@ export const createLeadSchema = z
       .default("event"),
     foodPackage: foodPackageSchema.optional(),
     services: z.array(serviceSchema).optional(),
+    remarks: z.array(remarkSchema).optional(),
     notes: z.string().optional(),
     cateringServiceVendor: z
       .object({
