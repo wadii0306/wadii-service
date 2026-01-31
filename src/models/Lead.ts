@@ -101,6 +101,69 @@ const FoodPackageSchema = new Schema(
   { _id: false }
 )
 
+const GSTCalculationSchema = new Schema(
+  {
+    enabled: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
+    food: {
+      rate: {
+        type: Number,
+        enum: [5, 18],
+        default: 5,
+        required: true,
+      },
+      taxableAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+      gstAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+    },
+    services: {
+      rate: {
+        type: Number,
+        enum: [5, 18],
+        default: 18,
+        required: true,
+      },
+      taxableAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+      gstAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+    },
+    totalGST: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+    grandTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
 const leadSchema = new Schema<ILead>(
   {
     venueId: {
@@ -366,6 +429,10 @@ const leadSchema = new Schema<ILead>(
     notes: {
       type: String,
       default: "",
+    },
+    gstCalculation: {
+      type: GSTCalculationSchema,
+      required: false,
     },
     createdBy: {
       type: Schema.Types.ObjectId,

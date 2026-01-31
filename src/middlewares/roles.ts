@@ -252,12 +252,15 @@ const hasPerm = (role?: RoleSnapshot, perm?: string): boolean => {
  *   1) req.params.businessId
  *   2) req.params.venueId -> look up Venue.businessId
  *   3) req.params.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   3.1) req.params.leadId -> look up Lead.venueId -> Venue.businessId
  *   4) req.query.venueId -> look up Venue.businessId (for GET requests with query params)
  *   5) req.query.businessId (for GET requests with query params)
  *   6) req.query.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   6.1) req.query.leadId -> look up Lead.venueId -> Venue.businessId
  *   7) req.body.businessId
  *   8) req.body.venueId -> look up Venue.businessId
  *   9) req.body.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   9.1) req.body.leadId -> look up Lead.venueId -> Venue.businessId
  */
 export async function resolveBusinessId(
   req: Request
@@ -277,7 +280,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(p["venueId"]))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (3) bookingId param -> lookup venue -> businessId
@@ -290,7 +294,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (3.1) leadId param -> lookup venue -> businessId
+    if (p["leadId"]) {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(p["leadId"]))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 
@@ -299,7 +319,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(q["venueId"]))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (5) businessId in query (for GET requests)
@@ -317,7 +338,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (6.1) leadId in query -> lookup venue -> businessId
+    if (q["leadId"] && typeof q["leadId"] === "string") {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(q["leadId"]))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 
@@ -331,7 +368,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(b.venueId))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (9) bookingId in body -> lookup venue -> businessId
@@ -344,7 +382,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (9.1) leadId in body -> lookup venue -> businessId
+    if (b?.leadId) {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(b.leadId))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 

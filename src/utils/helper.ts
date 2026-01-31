@@ -96,11 +96,11 @@ export function calculateTotals({
   services?: any[];
 }) {
   const foodCostTotal = foodPackage.totalPricePerPerson * numberOfGuests;
-
   const servicesTotal = services.reduce((sum, s) => sum + (s.price || 0), 0);
 
   return {
     foodCostTotal,
+    servicesTotal,
     totalAmount: foodCostTotal + servicesTotal,
   };
 }
@@ -152,5 +152,92 @@ export function validateFoodPackageLimits(
   return {
     isValid: errors.length === 0,
     errors,
+  };
+}
+
+/**
+ * Calculate GST for food and services separately
+ * 
+ * @param foodCostTotal - Total cost of food package
+ * @param servicesTotal - Total cost of additional services
+ * @param foodGSTRate - GST rate for food (5% or 18%)
+ * @param servicesGSTRate - GST rate for services (5% or 18%)
+ * @returns GST calculation breakdown matching schema
+ */
+export function calculateGST({
+  foodCostTotal,
+  servicesTotal,
+  foodGSTRate = 5,
+  servicesGSTRate = 18,
+}: {
+  foodCostTotal: number;
+  servicesTotal: number;
+  foodGSTRate?: 5 | 18;
+  servicesGSTRate?: 5 | 18;
+}) {
+  const foodGSTAmount = (foodCostTotal * foodGSTRate) / 100;
+  const servicesGSTAmount = (servicesTotal * servicesGSTRate) / 100;
+
+  const totalGST = foodGSTAmount + servicesGSTAmount;
+  const subtotal = foodCostTotal + servicesTotal;
+  const grandTotal = subtotal + totalGST;
+
+  return {
+    enabled: true,
+
+    food: {
+      rate: foodGSTRate,
+      taxableAmount: Math.round(foodCostTotal * 100) / 100,
+      gstAmount: Math.round(foodGSTAmount * 100) / 100,
+    },
+
+    services: {
+      rate: servicesGSTRate,
+      taxableAmount: Math.round(servicesTotal * 100) / 100,
+      gstAmount: Math.round(servicesGSTAmount * 100) / 100,
+    },
+
+    totalGST: Math.round(totalGST * 100) / 100,
+    grandTotal: Math.round(grandTotal * 100) / 100,
+  };
+}
+
+/**
+ * Calculate totals with GST (new function - doesn't break existing calculateTotals)
+ * 
+ * @param foodPackage - Food package with pricing
+ * @param numberOfGuests - Number of guests
+ * @param services - Additional services array
+ * @param foodGSTRate - GST rate for food (5% or 18%)
+ * @param servicesGSTRate - GST rate for services (5% or 18%)
+ * @returns Totals breakdown with GST calculation
+ */
+export function calculateTotalsWithGST({
+  foodPackage,
+  numberOfGuests,
+  services = [],
+  foodGSTRate = 5,
+  servicesGSTRate = 18,
+}: {
+  foodPackage: any;
+  numberOfGuests: number;
+  services?: any[];
+  foodGSTRate?: 5 | 18;
+  servicesGSTRate?: 5 | 18;
+}) {
+  const foodCostTotal = foodPackage.totalPricePerPerson * numberOfGuests;
+  const servicesTotal = services.reduce((sum, s) => sum + (s.price || 0), 0);
+
+  const gst = calculateGST({
+    foodCostTotal,
+    servicesTotal,
+    foodGSTRate,
+    servicesGSTRate,
+  });
+
+  return {
+    foodCostTotal: Math.round(foodCostTotal * 100) / 100,
+    servicesTotal: Math.round(servicesTotal * 100) / 100,
+    gst,
   };
 }

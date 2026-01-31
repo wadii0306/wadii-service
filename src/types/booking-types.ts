@@ -41,6 +41,22 @@ export interface ISelectedMenuSection {
   selectedItems: ISelectedMenuItem[];
 }
 
+export interface IGSTCalculation {
+  enabled: boolean;
+  food: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  services: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  totalGST: number;
+  grandTotal: number;
+}
+
 export interface IBooking extends Document {
   _id: Types.ObjectId;
   venueId: Types.ObjectId;
@@ -100,6 +116,7 @@ export interface IBooking extends Document {
   };
   notes?: string;
   internalNotes?: string;
+  gstCalculation?: IGSTCalculation;
   // Tracking (Booking-specific)
   createdBy?: Types.ObjectId;
   updatedBy?: Types.ObjectId;
@@ -170,6 +187,7 @@ export interface CreateBookingDTO {
   };
   notes?: string;
   internalNotes?: string;
+  gstCalculation?: IGSTCalculation;
   createdBy?: Types.ObjectId;
 }
 
@@ -234,6 +252,7 @@ export interface UpdateBookingDTO {
   };
   notes?: string;
   internalNotes?: string;
+  gstCalculation?: IGSTCalculation;
   updatedBy?: Types.ObjectId;
 }
 

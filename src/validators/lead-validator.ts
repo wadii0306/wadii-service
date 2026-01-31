@@ -67,6 +67,23 @@ const remarkSchema = z.object({
 });
 
 /**
+ * GST calculation schema
+ */
+const gstCalculationSchema = z.object({
+  enabled: z.boolean().default(false),
+  food: z.object({
+    rate: z.number().refine((val) => val === 5 || val === 18, {
+      message: "Food GST rate must be either 5 or 18"
+    }).default(5),
+  }).optional(),
+  services: z.object({
+    rate: z.number().refine((val) => val === 5 || val === 18, {
+      message: "Services GST rate must be either 5 or 18"
+    }).default(18),
+  }).optional(),
+}).optional();
+
+/**
  * Create lead validation schema
  */
 export const createLeadSchema = z
@@ -87,6 +104,7 @@ export const createLeadSchema = z
     services: z.array(serviceSchema).optional(),
     remarks: z.array(remarkSchema).optional(),
     notes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
     cateringServiceVendor: z
       .object({
         name: z.string(),
@@ -130,6 +148,7 @@ export const updateLeadSchema = z
       })
       .optional(),
     notes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
   })
   .optional();
 

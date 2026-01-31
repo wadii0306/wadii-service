@@ -43,6 +43,22 @@ export interface ISelectedMenuSection {
   selectedItems: ISelectedMenuItem[];
 }
 
+export interface IGSTCalculation {
+  enabled: boolean;
+  food: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  services: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  totalGST: number;
+  grandTotal: number;
+}
+
 export interface ILead extends Document {
   _id: Types.ObjectId;
   venueId: Types.ObjectId;
@@ -94,6 +110,7 @@ export interface ILead extends Document {
   }>;
   selectedMenu?: ISelectedMenuSection[];
   notes?: string;
+  gstCalculation?: IGSTCalculation;
   remarks?: Types.ObjectId[];
   createdBy?: Types.ObjectId;
   updatedBy?: Types.ObjectId;
@@ -152,6 +169,7 @@ export interface CreateLeadDTO {
     price: number;
   }>;
   notes?: string;
+  gstCalculation?: IGSTCalculation;
   createdBy?: Types.ObjectId;
 }
 
@@ -204,6 +222,7 @@ export interface UpdateLeadDTO {
     price: number;
   }>;
   notes?: string;
+  gstCalculation?: IGSTCalculation;
   updatedBy?: Types.ObjectId;
 }
 

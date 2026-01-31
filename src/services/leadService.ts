@@ -1,6 +1,6 @@
 import { Lead } from "../models/Lead";
 import { ILead } from "../types/lead-types";
-import { oid, recalcFoodPackage } from "../utils/helper";
+import { oid, recalcFoodPackage, calculateTotalsWithGST } from "../utils/helper";
 import BlackoutDayService from "./blackoutDayService";
 
 export class LeadService {
@@ -64,6 +64,26 @@ export class LeadService {
       // Extract remarks from lead data before creating Lead
       const { remarks, ...pureLeadData } = leadData as any;
       const remarksData = remarks;
+
+      // Calculate GST if foodPackage and services are present and GST is enabled
+      if (pureLeadData.foodPackage && pureLeadData.gstCalculation?.enabled) {
+        const totalsWithGST = calculateTotalsWithGST({
+          foodPackage: pureLeadData.foodPackage,
+          numberOfGuests: pureLeadData.numberOfGuests || 0,
+          services: pureLeadData.services || [],
+          foodGSTRate: pureLeadData.gstCalculation.food?.rate || 5,
+          servicesGSTRate: pureLeadData.gstCalculation.services?.rate || 18,
+        });
+
+        // Update GST calculation with actual calculated values
+        pureLeadData.gstCalculation = {
+          enabled: true,
+          food: totalsWithGST.gst.food,
+          services: totalsWithGST.gst.services,
+          totalGST: totalsWithGST.gst.totalGST,
+          grandTotal: totalsWithGST.gst.grandTotal,
+        };
+      }
 
       const lead = new Lead(pureLeadData)
       await lead.save()
@@ -229,9 +249,12 @@ export class LeadService {
     updateData: Partial<ILead>
   ): Promise<ILead | null> {
     try {
+      // Fetch current lead once at the beginning for potential GST calculation
+      let currentLead: any = null;
+      
       if (updateData.foodPackage) {
         // Fetch current lead to get existing foodPackage data
-        const currentLead = await Lead.findById(leadId).lean();
+        currentLead = await Lead.findById(leadId).lean();
         
         // Only recalculate if totalPricePerPerson is not already set (preserve user edits)
         if (!updateData.foodPackage.totalPricePerPerson) {
@@ -292,6 +315,38 @@ export class LeadService {
           updateData.foodPackage.totalAddonPrice = updateData.foodPackage.totalPricePerPerson - updateData.foodPackage.defaultPrice;
         }
       }
+
+      // Calculate GST if GST is enabled in updateData or if foodPackage/services/numberOfGuests are updated
+      if (updateData.gstCalculation?.enabled || (updateData.foodPackage || updateData.services || updateData.numberOfGuests)) {
+        // Get current lead data if we need it for GST calculation (use existing currentLead if available)
+        if (!currentLead) {
+          currentLead = await Lead.findById(leadId).lean();
+        }
+        
+        const foodPackage = updateData.foodPackage || currentLead?.foodPackage;
+        const services = updateData.services || currentLead?.services || [];
+        const numberOfGuests = updateData.numberOfGuests || currentLead?.numberOfGuests || 0;
+        
+        if (foodPackage && (updateData.gstCalculation?.enabled || currentLead?.gstCalculation?.enabled)) {
+          const totalsWithGST = calculateTotalsWithGST({
+            foodPackage,
+            numberOfGuests,
+            services,
+            foodGSTRate: updateData.gstCalculation?.food?.rate || currentLead?.gstCalculation?.food?.rate || 5,
+            servicesGSTRate: updateData.gstCalculation?.services?.rate || currentLead?.gstCalculation?.services?.rate || 18,
+          });
+
+          // Update GST calculation with actual calculated values
+          updateData.gstCalculation = {
+            enabled: true,
+            food: totalsWithGST.gst.food,
+            services: totalsWithGST.gst.services,
+            totalGST: totalsWithGST.gst.totalGST,
+            grandTotal: totalsWithGST.gst.grandTotal,
+          };
+        }
+      }
+
       const lead = await Lead.findByIdAndUpdate(
         leadId,
         { ...updateData, updatedAt: new Date() },

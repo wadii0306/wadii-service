@@ -58,6 +58,20 @@ const foodPackageSchema = z.object({
   defaultPrice: z.number().min(0).optional(),
 })
 
+const gstCalculationSchema = z.object({
+  enabled: z.boolean().default(false),
+  food: z.object({
+    rate: z.number().refine((val) => val === 5 || val === 18, {
+      message: "Food GST rate must be either 5 or 18"
+    }).default(5),
+  }).optional(),
+  services: z.object({
+    rate: z.number().refine((val) => val === 5 || val === 18, {
+      message: "Services GST rate must be either 5 or 18"
+    }).default(18),
+  }).optional(),
+}).optional();
+
 
 
 
@@ -117,6 +131,7 @@ export const createBookingSchema = z
       .optional(),
     notes: z.string().optional(),
     internalNotes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
   })
   .refine(
     (data) => {
@@ -182,6 +197,7 @@ export const updateBookingSchema = z
       .optional(),
     notes: z.string().optional(),
     internalNotes: z.string().optional(),
+    gstCalculation: gstCalculationSchema.optional(),
   })
   .partial()
   .refine(
