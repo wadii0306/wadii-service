@@ -111,7 +111,7 @@ const GSTCalculationSchema = new Schema(
     food: {
       rate: {
         type: Number,
-        enum: [5, 18],
+        enum: [0, 5, 18],
         default: 5,
         required: true,
       },
@@ -131,7 +131,7 @@ const GSTCalculationSchema = new Schema(
     services: {
       rate: {
         type: Number,
-        enum: [5, 18],
+        enum: [0, 5, 18],
         default: 18,
         required: true,
       },

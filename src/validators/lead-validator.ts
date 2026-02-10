@@ -72,13 +72,13 @@ const remarkSchema = z.object({
 const gstCalculationSchema = z.object({
   enabled: z.boolean().default(false),
   food: z.object({
-    rate: z.number().refine((val) => val === 5 || val === 18, {
-      message: "Food GST rate must be either 5 or 18"
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Food GST rate must be 0 (disabled), 5, or 18"
     }).default(5),
   }).optional(),
   services: z.object({
-    rate: z.number().refine((val) => val === 5 || val === 18, {
-      message: "Services GST rate must be either 5 or 18"
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Services GST rate must be 0 (disabled), 5, or 18"
     }).default(18),
   }).optional(),
 }).optional();
