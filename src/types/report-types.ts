@@ -50,6 +50,13 @@ export interface DebtorInfo {
     amount: number;
     note?: string;
   };
+  gstCalculation?: {
+    enabled: boolean;
+    food?: { rate: number; taxableAmount: number; gstAmount: number };
+    services?: { rate: number; taxableAmount: number; gstAmount: number };
+    totalGST: number;
+    grandTotal: number;
+  };
 }
 
 export interface CreditorInfo {

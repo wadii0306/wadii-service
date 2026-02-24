@@ -53,6 +53,7 @@ export class ReportService {
       const transactionQuery: any = {
         bookingId: { $in: bookingIds },
         status: "success",
+        direction: "inbound", // ONLY income transactions for debtor report
       };
 
       if (paymentMode) {
@@ -138,6 +139,7 @@ export class ReportService {
             paymentMode: booking.payment.paymentMode,
             occasionType: booking.occasionType,
             discount: (booking as any).discount || undefined,
+            gstCalculation: (booking as any).gstCalculation || undefined,
           });
         }
       }
@@ -170,7 +172,7 @@ export class ReportService {
             vendorName: po.vendorDetails.name,
             amountDue: amountDue,
             eventDate: booking.eventStartDateTime,
-            // Removed bankDetails from cash ledger report
+            bankDetails: po.vendorDetails.bankDetails, // Restore bankDetails for the frontend
             poNumber: po.poNumber,
             poTotalAmount: po.totalAmount,
             poPaidAmount: po.paidAmount,
