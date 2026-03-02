@@ -70,7 +70,7 @@ class App {
     if (this.envConfig.NODE_ENV === "development") {
       this.app.use((req, res, next) => {
         console.log(
-          "🌐 ${req.method} ${req.path} - ${new Date().toISOString()}"
+          `🌐 ${req.method} ${req.path} - ${new Date().toISOString()}`
         );
         next();
       });
@@ -117,10 +117,10 @@ class App {
     this.app.listen(port, () => {
       console.log("\n🚀 =======================================");
       console.log("🎯 Banquet Booking API Server Running!");
-      console.log("📍 Environment: ${this.envConfig.NODE_ENV}");
-      console.log("🌐 Port: ${port}");
-      console.log("📖 API Documentation: http://localhost:${port}/api/docs");
-      console.log("💚 Health Check: http://localhost:${port}/api/health");
+      console.log(`📍 Environment: ${this.envConfig.NODE_ENV}`);
+      console.log(`🌐 Port: ${port}`);
+      console.log(`📖 API Documentation: http://localhost:${port}/api/docs`);
+      console.log(`💚 Health Check: http://localhost:${port}/api/health`);
       console.log("🚀 =======================================\n");
     });
 

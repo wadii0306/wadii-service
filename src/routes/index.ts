@@ -11,6 +11,7 @@ import reportRoutes from "./reportRoutes";
 import blackoutDayRoutes from "./blackoutDayRoutes";
 import foodMenuRoutes from "./foodMenuRoutes";
 import leadRemarkRoutes from "./leadRemarkRoutes";
+import contactRoutes from "./website/contactRouts";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use("/purchase-orders", purchaseOrderRoutes);
 router.use("/reports", reportRoutes);
 router.use("/blackout-days", blackoutDayRoutes);
 router.use("/lead-remarks", leadRemarkRoutes);
+router.use("/website", contactRoutes);
 
 export default router;

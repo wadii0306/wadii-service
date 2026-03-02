@@ -72,6 +72,12 @@ export const PERMS = {
   LEAD_ASSIGN: "lead.assign",
   LEAD_UPDATE: "lead.update",
   LEAD_DELETE: "lead.delete",
+
+  // Contact management
+  CONTACT_CREATE: "contact.create",
+  CONTACT_READ: "contact.read",
+  CONTACT_UPDATE: "contact.update",
+  CONTACT_DELETE: "contact.delete",
 } as const;
 
 // Role to permissions mapping - easily extensible
@@ -175,6 +181,11 @@ export const ROLE_TO_PERMS = {
     "lead.assign",
     "lead.update",
     "lead.delete",
+    // All contact permissions
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
   ],
 
   // MANAGER: Can access and modify all data but with some restrictions
@@ -222,6 +233,11 @@ export const ROLE_TO_PERMS = {
     "lead.assign",
     "lead.update",
     "lead.delete",
+    // Full contact management
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
   ],
 } as const;
 
