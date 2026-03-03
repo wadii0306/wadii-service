@@ -13,7 +13,6 @@ export interface IQRInquiry extends Document {
     createdAt: Date;
     updatedAt: Date;
 }
-
 const qrInquirySchema = new Schema<IQRInquiry>(
     {
         businessId: {

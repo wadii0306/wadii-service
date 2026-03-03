@@ -66,6 +66,6 @@ publicRoutes.post("/inquiry/:businessId", async (req, res) => {
         console.error("Error submitting public enquiry:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-});
+}); 
 
 export default publicRoutes;

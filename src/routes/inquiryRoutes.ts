@@ -25,7 +25,7 @@ inquiryRoutes.get("/business/:businessId", async (req, res) => {
         console.error("Error fetching inquiries:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-});
+}); 
 
 // Update inquiry status
 inquiryRoutes.patch("/:inquiryId/status", async (req, res) => {

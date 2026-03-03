@@ -192,4 +192,4 @@ export interface OwnerBusinessResponse {
     inactiveBusinesses: number;
     totalVenues: number;
   };
-}
+} 

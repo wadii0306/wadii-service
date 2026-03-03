@@ -89,7 +89,6 @@ const businessSchema = new Schema<IBusiness>(
     versionKey: false,
   }
 );
-
 // Indexes for performance
 businessSchema.index({ ownerId: 1 });
 businessSchema.index({ status: 1 });
