@@ -29,6 +29,7 @@ export interface IBusiness extends Document<Types.ObjectId> {
   website?: string | null;
   socials?: { name: string; url: string }[];
   branding: { logoUrl?: string | null };
+  qrCode?: string | null;
 
   status: "inactive" | "active";
   isDeleted: boolean;

@@ -3,6 +3,7 @@ import { Business } from "../models/Business";
 import { UserBusinessRole } from "../models/UserBusinessRole";
 import { IBusiness, IUserBusinessRole } from "../types";
 import { ROLE_TO_PERMS } from "../middlewares/roles";
+import QRCode from "qrcode";
 
 export type RoleSnapshot = {
   role: "developer" | "owner" | "manager";
@@ -45,6 +46,11 @@ export class BusinessService {
       createdBy, // auditing
       isDeleted: false, // default if present in schema
     });
+
+    // Generate QR code (links to public inquiry page)
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const qrCodeData = await QRCode.toDataURL(`${frontendUrl}/inquiry/${business._id}`);
+    business.qrCode = qrCodeData;
 
     await business.save();
 

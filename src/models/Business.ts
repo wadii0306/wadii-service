@@ -62,6 +62,10 @@ const businessSchema = new Schema<IBusiness>(
         default: null,
       },
     },
+    qrCode: {
+      type: String,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["inactive", "active"],
