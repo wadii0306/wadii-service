@@ -12,6 +12,8 @@ import blackoutDayRoutes from "./blackoutDayRoutes";
 import foodMenuRoutes from "./foodMenuRoutes";
 import leadRemarkRoutes from "./leadRemarkRoutes";
 import contactRoutes from "./website/contactRouts";
+import publicRoutes from "./publicRoutes";
+import inquiryRoutes from "./inquiryRoutes";
 
 const router = Router();
 
@@ -24,6 +26,9 @@ router.get("/health", (req, res) => {
     environment: process.env.NODE_ENV || "development",
   });
 });
+
+// Public routes (no authentication required)
+router.use("/public", publicRoutes);
 
 router.use("/auth", authRoutes);
 router.use("/businesses", businessRoutes);
@@ -38,5 +43,6 @@ router.use("/reports", reportRoutes);
 router.use("/blackout-days", blackoutDayRoutes);
 router.use("/lead-remarks", leadRemarkRoutes);
 router.use("/website", contactRoutes);
+router.use("/inquiries", inquiryRoutes);
 
 export default router;
