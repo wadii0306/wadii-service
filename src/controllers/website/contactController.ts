@@ -57,14 +57,22 @@ export class ContactController {
     res: Response
   ): Promise<void> {
     try {
+      console.log('[CONTACT] getContacts called');
+      console.log('[CONTACT] req.user:', req.user);
+      console.log('[CONTACT] req.userRole:', (req as any).userRole);
+      
       if (!req.user?.userId) {
+        console.log('[CONTACT] No userId in request');
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
+      console.log('[CONTACT] User authenticated, calling contactService');
       const filters: ContactQueryInput = req.query;
       const result = await contactService.getContacts(filters);
 
+      console.log('[CONTACT] contactService result:', result);
+      
       if (result.success) {
         res.status(200).json(result);
       } else {

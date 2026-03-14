@@ -14,6 +14,7 @@ import leadRemarkRoutes from "./leadRemarkRoutes";
 import contactRoutes from "./website/contactRouts";
 import publicRoutes from "./publicRoutes";
 import inquiryRoutes from "./inquiryRoutes";
+import adminRoutes from "./adminRoutes";
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.get("/health", (req, res) => {
 router.use("/public", publicRoutes);
 
 router.use("/auth", authRoutes);
+router.use("/admin", adminRoutes); // Admin-specific routes
 router.use("/businesses", businessRoutes);
 router.use("/venues", venueRoutes);
 router.use("/venues", foodMenuRoutes); // Food menu routes under /venues/:venueId/food-menu

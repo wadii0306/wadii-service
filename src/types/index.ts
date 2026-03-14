@@ -7,6 +7,8 @@ export interface IUser extends Document<Types.ObjectId> {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
+  mustChangePassword?: boolean;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: Types.ObjectId | string;
@@ -150,7 +152,7 @@ export interface IUserBusinessRole extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
   businessId: Types.ObjectId;
   venueId?: Types.ObjectId; // Optional - for venue-specific assignments
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions: string[];
   scope: "business" | "venue"; // business = all venues, venue = specific venue
   assignedBy?: Types.ObjectId; // Who assigned this role
@@ -161,9 +163,9 @@ export interface IUserBusinessRole extends Document<Types.ObjectId> {
 export interface IJWTPayload {
   userId: string;
   email: string;
+  role?: "developer" | "owner" | "manager" | "admin" | "marketing" | "user";
   iat?: number;
   exp?: number;
-  role?: "developer" | "owner" | "manager" | "user";
 }
 
 export interface OwnerBusinessFilters {

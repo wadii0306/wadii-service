@@ -70,7 +70,7 @@ export class AuthService {
       firstName: firstName.trim(),
       lastName: lastName?.trim(),
       phone: phone?.trim() ?? null,
-      role: userData.role || "owner",
+      role: userData.role,
       mustChangePassword: false,
     });
 

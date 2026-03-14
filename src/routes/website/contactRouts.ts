@@ -55,13 +55,27 @@ contactRoutes.get(
  * Get a single contact by ID
  * GET /api/website/contact/:id
  * Required: contact.read permission
+ * Note: Only matches valid ObjectId patterns (24 hex characters)
  */
 contactRoutes.get(
-  "/:id",
+  "/:id([0-9a-fA-F]{24})",
   authMiddleware,
   requirePerm(ROLE_PERMS.CONTACT_READ),
   validate("params", getContactByIdSchema),
   ContactController.getContactById
+);
+
+/**
+ * Get all contacts with filtering and pagination
+ * GET /api/website/contact
+ * Required: contact.read permission
+ */
+contactRoutes.get(
+  "/",
+  authMiddleware,
+  requirePerm(ROLE_PERMS.CONTACT_READ),
+  validate("query", contactQuerySchema),
+  ContactController.getContacts
 );
 
 /**
@@ -70,7 +84,7 @@ contactRoutes.get(
  * Required: contact.update permission
  */
 contactRoutes.put(
-  "/:id",
+  "/:id([0-9a-fA-F]{24})",
   authMiddleware,
   requirePerm(ROLE_PERMS.CONTACT_UPDATE),
   validate("params", getContactByIdSchema),
@@ -84,7 +98,7 @@ contactRoutes.put(
  * Required: contact.update permission
  */
 contactRoutes.post(
-  "/:id/notes",
+  "/:id([0-9a-fA-F]{24})/notes",
   authMiddleware,
   requirePerm(ROLE_PERMS.CONTACT_UPDATE),
   validate("params", getContactByIdSchema),
@@ -98,7 +112,7 @@ contactRoutes.post(
  * Required: contact.delete permission
  */
 contactRoutes.delete(
-  "/:id",
+  "/:id([0-9a-fA-F]{24})",
   authMiddleware,
   requirePerm(ROLE_PERMS.CONTACT_DELETE),
   validate("params", deleteContactSchema),

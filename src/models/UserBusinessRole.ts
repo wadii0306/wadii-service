@@ -15,7 +15,7 @@ const UserBusinessRoleSchema = new Schema(
     },
     role: {
       type: String,
-      enum: ["developer", "owner", "manager"],
+      enum: ["developer", "owner", "manager", "admin", "marketing"],
       required: true,
     },
     permissions: { type: [String], default: [] },

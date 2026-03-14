@@ -22,6 +22,7 @@ export const userValidationSchemas = {
     firstName: z.string(),
     lastName: z.string().optional(),
     phone: z.string().nullable().optional(),
+    role: z.enum(["developer", "owner", "manager", "admin", "marketing"]).optional(),
   }),
 
   createUserByAdmin: z.object({

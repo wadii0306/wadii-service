@@ -1,0 +1,579 @@
+import { Types } from "mongoose";
+import { User } from "../models/User";
+import { UserBusinessRole } from "../models/UserBusinessRole";
+import { Business } from "../models/Business";
+import { Venue } from "../models/Venue";
+import { PasswordUtils } from "../utils/password";
+import { IUser, IUserBusinessRole } from "../types";
+import crypto from "crypto";
+import { ROLE_TO_PERMS } from "../middlewares/roles";
+
+
+
+function mapAssignmentDocToDto(result: any): IManagerAssignment {
+  return {
+    _id: result._id.toString(),
+    user: {
+      _id: result.userId._id.toString(),
+      email: result.userId.email,
+      firstName: result.userId.firstName,
+      lastName: result.userId.lastName,
+      phone: result.userId.phone,
+    },
+    business: {
+      _id: result.businessId._id.toString(),
+      businessName: result.businessId.businessName,
+    },
+    venue: result.venueId
+      ? {
+          _id: result.venueId._id.toString(),
+          venueName: result.venueId.venueName,
+        }
+      : undefined,
+    scope: result.scope,
+    assignedBy: result.assignedBy?.toString(),
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+  };
+}
+
+export interface ICreateManagerData {
+  email: string;
+  firstName: string;
+  lastName?: string;
+  phone?: string;
+  businessId: string;
+  password: string;
+}
+export interface IUpdateManagerData {
+  managerId: string;
+  email: string;
+  firstName: string;
+  lastName?: string;
+  phone?: string;
+  businessId?: string;
+}
+
+export interface IAssignManagerData {
+  managerId: string;
+  venueId?: string; // If provided, manager assigned to specific venue
+  businessId: string; // Always required for scope
+  scope: "business" | "venue"; // business = all venues, venue = specific venue
+}
+
+export interface IManagerAssignment {
+  _id: string;
+  user: {
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName?: string;
+    phone?: string;
+  };
+  business: {
+    _id: string;
+    businessName: string;
+  };
+  venue?: {
+    _id: string;
+    venueName: string;
+  };
+  scope: "business" | "venue";
+  assignedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const oid = (id: string | Types.ObjectId) =>
+  typeof id === "string" ? new Types.ObjectId(id) : id;
+
+export class ManagerService {
+  /**
+   * Create a new manager user for a business
+   */
+  static async createManager(
+    managerData: ICreateManagerData,
+    createdBy: string
+  ): Promise<{ user: IUser; tempPassword?: string }> {
+    const email = managerData.email.trim().toLowerCase();
+    const { firstName, lastName, phone, businessId, password } = managerData;
+    const plainPassword = password;
+
+    // Check if user already exists
+    const existing = await User.findOne({ email }).lean();
+    if (existing) throw new Error("User already exists with this email");
+
+    // Verify business exists
+    const business = await Business.findOne({
+      _id: oid(businessId),
+      isDeleted: false,
+    }).lean();
+    if (!business) throw new Error("Business not found");
+
+    // Determine password logic
+    let tempPassword: string | undefined;
+    let hashedPassword: string;
+
+    console.log(plainPassword);
+
+    if (plainPassword && plainPassword.length > 0) {
+      // ✅ Use provided password
+      hashedPassword = await PasswordUtils.hashPassword(plainPassword);
+    } else {
+      // ⚙️ Generate temp password if none provided
+      tempPassword = crypto.randomBytes(6).toString("base64url");
+      hashedPassword = await PasswordUtils.hashPassword(tempPassword);
+    }
+
+    // Create user
+    const user = new User({
+      email,
+      password: hashedPassword,
+      firstName: firstName.trim(),
+      lastName: lastName?.trim(),
+      phone: phone?.trim() ?? null,
+      role: "manager",
+      mustChangePassword: !plainPassword, // Only force change if temp password used
+      createdBy: oid(createdBy),
+    });
+
+    await user.save();
+
+    // Create business role
+    const businessRole = new UserBusinessRole({
+      userId: user._id,
+      businessId: oid(businessId),
+      role: "manager",
+      scope: "business",
+      assignedBy: oid(createdBy),
+      permissions: ROLE_TO_PERMS.manager,
+    });
+
+    await businessRole.save();
+
+    // Return plain object and only include tempPassword if generated
+    return {
+      user: user.toObject() as IUser,
+      ...(tempPassword ? { tempPassword } : {}), // only returned when generated
+    };
+  }
+
+  /**
+   * List all managers for a business
+   */
+  static async getManagersByBusiness(
+    businessId: string,
+    userId: string
+  ): Promise<IManagerAssignment[]> {
+    // Verify user has access to this business
+
+
+
+    console.log("userId from service", userId);
+    const hasAccess = await UserBusinessRole.findOne({
+      userId: oid(userId),
+      businessId: oid(businessId),
+      role: { $in: ["owner", "admin", "developer", "manager"] },
+    }).lean();
+
+    console.log("has access from service", hasAccess);
+
+    if (!hasAccess) throw new Error("Access denied to this business");
+
+    const managers = await UserBusinessRole.find({
+      businessId: oid(businessId),
+      role: "manager",
+    })
+      .populate({
+        path: "userId",
+        select: "email firstName lastName phone",
+      })
+      .populate({
+        path: "businessId",
+        select: "businessName",
+      })
+      .populate({
+        path: "venueId",
+        select: "venueName",
+      })
+      .lean();
+
+    return managers.map((manager: any) => ({
+      _id: manager._id.toString(),
+      user: {
+        _id: manager.userId._id.toString(),
+        email: manager.userId.email,
+        firstName: manager.userId.firstName,
+        lastName: manager.userId.lastName,
+        phone: manager.userId.phone,
+      },
+      business: {
+        _id: manager.businessId._id.toString(),
+        businessName: manager.businessId.businessName,
+      },
+      venue: manager.venueId
+        ? {
+            _id: manager.venueId._id.toString(),
+            venueName: manager.venueId.venueName,
+          }
+        : undefined,
+      scope: manager.scope,
+      assignedBy: manager.assignedBy?.toString(),
+      createdAt: manager.createdAt,
+      updatedAt: manager.updatedAt,
+    }));
+  }
+
+  /**
+   * List all managers assigned to a specific venue
+   */
+  static async getManagersByVenue(
+    venueId: string,
+    userId: string
+  ): Promise<IManagerAssignment[]> {
+    console.log("[getManagersByVenue] Starting function with:", { venueId, userId });
+    
+    // Get venue to find businessId
+    const venue = await Venue.findById(oid(venueId)).lean();
+    console.log("[getManagersByVenue] Found venue:", venue);
+    
+    if (!venue) throw new Error("Venue not found");
+    
+    console.log("[getManagersByVenue] Venue businessId:", venue.businessId);
+
+    // Verify user has access to this business
+    console.log("[getManagersByVenue] Checking user access for userId:", userId, "businessId:", venue.businessId);
+    
+    const hasAccess = await UserBusinessRole.findOne({
+      userId: oid(userId),
+      businessId: oid(venue.businessId),
+      role: { $in: ["owner", "admin", "developer", "manager"] },
+    }).lean();
+
+    console.log("[getManagersByVenue] User access check result:", hasAccess);
+    console.log("[getManagersByVenue] Looking for role in:", ["owner", "admin", "developer", "manager"]);
+
+    if (!hasAccess) {
+      console.log("[getManagersByVenue] ACCESS DENIED - User does not have required role");
+      
+      // Let's check what roles this user actually has
+      const userRoles = await UserBusinessRole.find({
+        userId: oid(userId),
+        businessId: oid(venue.businessId),
+      }).lean();
+      
+      console.log("[getManagersByVenue] User's actual roles in this business:", userRoles);
+      
+      // Let's also check all roles for this user across all businesses
+      const allUserRoles = await UserBusinessRole.find({
+        userId: oid(userId),
+      }).lean();
+      
+      console.log("[getManagersByVenue] All roles for this user across all businesses:", allUserRoles);
+      
+      throw new Error("Access denied to this venue");
+    }
+
+    // Find managers with venue-specific or business-level access to this venue
+    // Exclude users whose primary role is 'owner'
+    const managers = await UserBusinessRole.find({
+      $and: [
+        {
+          $or: [
+            // Venue-specific managers
+            { venueId: oid(venueId), role: "manager" },
+            // Business-level managers (have access to all venues)
+            {
+              businessId: oid(venue.businessId),
+              role: "manager",
+              scope: "business",
+              venueId: { $exists: false },
+            },
+          ],
+        },
+      ],
+    })
+      .populate({
+        path: "userId",
+        select: "email firstName lastName phone role",
+      })
+      .populate({
+        path: "businessId",
+        select: "businessName",
+      })
+      .populate({
+        path: "venueId",
+        select: "venueName",
+      })
+      .lean();
+
+    return managers.map((manager: any) => ({
+      _id: manager._id.toString(),
+      user: {
+        _id: manager.userId._id.toString(),
+        email: manager.userId.email,
+        firstName: manager.userId.firstName,
+        lastName: manager.userId.lastName,
+        phone: manager.userId.phone,
+      },
+      business: {
+        _id: manager.businessId._id.toString(),
+        businessName: manager.businessId.businessName,
+      },
+      venue: manager.venueId
+        ? {
+            _id: manager.venueId._id.toString(),
+            venueName: manager.venueId.venueName,
+          }
+        : undefined,
+      scope: manager.scope,
+      assignedBy: manager.assignedBy?.toString(),
+      createdAt: manager.createdAt,
+      updatedAt: manager.updatedAt,
+    }));
+  }
+
+  static async updateManager(
+    managerData: IUpdateManagerData
+  ): Promise<{ user: IUser }> {
+    const email = managerData.email.trim().toLowerCase();
+    const { firstName, lastName, phone, managerId } = managerData;
+
+    const manager = await User.findById(managerId).lean();
+    if (!manager) throw new Error("Manager not found");
+    if (manager.role !== "manager") throw new Error("User is not a manager");
+
+    const updateData = {
+      email,
+      firstName: firstName.trim(),
+      lastName: lastName?.trim(),
+      phone: phone?.trim() ?? null,
+    };
+    const updatedUser = (await User.findByIdAndUpdate(
+      oid(managerId),
+      { $set: updateData },
+      { new: true, runValidators: true }
+    )) as IUser;
+
+    return { user: updatedUser };
+  }
+
+  /**
+   * Assign existing manager to a venue (or update scope)
+   */
+
+  static async assignManagerToVenue(
+    assignmentData: IAssignManagerData, // requires businessId, venueId, scope === 'venue'
+    assignedBy: string
+  ): Promise<IManagerAssignment> {
+    const { managerId, venueId, businessId, scope } = assignmentData;
+
+    console.log("[assignManagerToVenue] Start assignment", {
+      assignmentData,
+      assignedBy,
+    });
+
+    // 1) Validate inputs/entities
+    const manager = await User.findById(oid(managerId)).lean();
+    console.log("[assignManagerToVenue] Fetched manager", manager);
+    if (!manager) throw new Error("Manager not found");
+    if (manager.role !== "manager") throw new Error("User is not a manager");
+
+    const business = await Business.findOne({
+      _id: oid(businessId),
+      isDeleted: false,
+    }).lean();
+    console.log("[assignManagerToVenue] Fetched business", business);
+    if (!business) throw new Error("Business not found");
+
+    if (scope !== "venue" || !venueId) {
+      throw new Error(
+        "This service only supports venue-scoped manager assignment"
+      );
+    }
+    const venue = await Venue.findOne({
+      _id: oid(venueId),
+      businessId: oid(businessId),
+    }).lean();
+    console.log("[assignManagerToVenue] Fetched venue", venue);
+    if (!venue)
+      throw new Error("Venue not found or doesn't belong to this business");
+
+    // 2) Check if a manager already exists for this (business, venue)
+    const filter = {
+      businessId: oid(businessId),
+      venueId: oid(venueId),
+      role: "manager" as const,
+    };
+    console.log(
+      "[assignManagerToVenue] Filter for existing assignment",
+      filter
+    );
+
+    let doc = await UserBusinessRole.findOne(filter)
+      .populate({ path: "userId", select: "email firstName lastName phone" })
+      .populate({ path: "businessId", select: "businessName" })
+      .populate({ path: "venueId", select: "venueName" })
+      .lean();
+
+    if (doc) {
+      console.log("[assignManagerToVenue] Manager already assigned", doc);
+      return mapAssignmentDocToDto(doc);
+    }
+
+    // 3) Atomically insert if missing (race-safe)
+    try {
+      console.log(
+        "[assignManagerToVenue] No existing manager found, inserting/updating"
+      );
+      const upserted = await UserBusinessRole.findOneAndUpdate(
+        filter,
+        {
+          $setOnInsert: {
+            userId: oid(managerId),
+            businessId: oid(businessId),
+            venueId: oid(venueId),
+            role: "manager",
+            scope: "venue",
+            assignedBy: oid(assignedBy),
+            permissions: ROLE_TO_PERMS.manager,
+          },
+        },
+        { upsert: true, new: true } // return existing or inserted
+      )
+        .populate({ path: "userId", select: "email firstName lastName phone" })
+        .populate({ path: "businessId", select: "businessName" })
+        .populate({ path: "venueId", select: "venueName" })
+        .lean();
+
+      console.log(
+        "[assignManagerToVenue] Upserted manager assignment",
+        upserted
+      );
+      return mapAssignmentDocToDto(upserted as any);
+    } catch (err: any) {
+      console.error("[assignManagerToVenue] Error during upsert", err);
+
+      // Handle duplicate key error gracefully
+      if (err?.code === 11000) {
+        console.log(
+          "[assignManagerToVenue] Duplicate detected, fetching existing manager"
+        );
+        const existing = await UserBusinessRole.findOne(filter)
+          .populate({
+            path: "userId",
+            select: "email firstName lastName phone",
+          })
+          .populate({ path: "businessId", select: "businessName" })
+          .populate({ path: "venueId", select: "venueName" })
+          .lean();
+        if (existing) {
+          console.log(
+            "[assignManagerToVenue] Returning existing assignment",
+            existing
+          );
+          return mapAssignmentDocToDto(existing as any);
+        }
+      }
+
+      throw err; // bubble up unexpected errors
+    }
+  }
+
+  // small helper to keep your DTO mapping DRY
+
+  /**
+   * Remove manager assignment
+   */
+  static async removeManagerAssignment(
+    assignmentId: string,
+    userId: string
+  ): Promise<boolean> {
+    const assignment = await UserBusinessRole.findById(
+      oid(assignmentId)
+    ).lean();
+    if (!assignment) throw new Error("Assignment not found");
+
+    // Verify user has permission to remove this assignment
+    const hasAccess = await UserBusinessRole.findOne({
+      userId: oid(userId),
+      businessId: assignment.businessId,
+      role: { $in: ["owner", "admin", "developer", "manager"] },
+    }).lean();
+
+    if (!hasAccess) throw new Error("Permission denied");
+
+    await UserBusinessRole.findByIdAndDelete(oid(assignmentId));
+    return true;
+  }
+
+  /**
+   * List all available managers in a business (for assignment purposes)
+   */
+  static async getAvailableManagers(
+    businessId: string,
+    userId: string
+  ): Promise<
+    Array<{
+      _id: string;
+      email: string;
+      firstName: string;
+      lastName?: string;
+      phone?: string;
+      currentAssignments: Array<{
+        scope: "business" | "venue";
+        venue?: string;
+      }>;
+    }>
+  > {
+    // Verify access
+    const hasAccess = await UserBusinessRole.findOne({
+      userId: oid(userId),
+      businessId: oid(businessId),
+      role: { $in: ["owner", "admin", "developer", "manager"] },
+    }).lean();
+
+    if (!hasAccess) throw new Error("Access denied to this business");
+
+    // Get all managers in the business
+    const managerRoles = await UserBusinessRole.find({
+      businessId: oid(businessId),
+      role: "manager",
+    })
+      .populate({
+        path: "userId",
+        select: "email firstName lastName phone",
+      })
+      .populate({
+        path: "venueId",
+        select: "venueName",
+      })
+      .lean();
+
+    // Group by manager
+    const managersMap = new Map();
+
+    managerRoles.forEach((role: any) => {
+      const managerId = role.userId._id.toString();
+
+      if (!managersMap.has(managerId)) {
+        managersMap.set(managerId, {
+          _id: managerId,
+          email: role.userId.email,
+          firstName: role.userId.firstName,
+          lastName: role.userId.lastName,
+          phone: role.userId.phone,
+          currentAssignments: [],
+        });
+      }
+
+      const manager = managersMap.get(managerId);
+      manager.currentAssignments.push({
+        scope: role.scope,
+        venue: role.venueId ? role.venueId.venueName : undefined,
+      });
+    });
+
+    return Array.from(managersMap.values());
+  }
+}

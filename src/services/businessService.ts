@@ -38,7 +38,15 @@ export class BusinessService {
     businessData: ICreateBusinessData,
     createdBy: string
   ): Promise<IBusiness> {
-    const ownerId = businessData.ownerId ?? createdBy;
+    console.log('BusinessService.createBusiness - Input ownerId:', businessData.ownerId);
+    console.log('BusinessService.createBusiness - createdBy:', createdBy);
+    
+    // Proper ObjectId conversion with explicit fallback
+    const ownerId = businessData.ownerId
+      ? new Types.ObjectId(businessData.ownerId)
+      : new Types.ObjectId(createdBy);
+    
+    console.log('BusinessService.createBusiness - Final ownerId:', ownerId.toString());
 
     const business = new Business({
       ...businessData,
@@ -56,13 +64,25 @@ export class BusinessService {
 
     // Create owner role for the creator/owner scoped to this business
     const ownerRole = new UserBusinessRole({
-      userId: new Types.ObjectId(ownerId),
+      userId: ownerId,
       businessId: business._id,
       role: "owner",
       permissions: ROLE_TO_PERMS.owner,
     });
 
     await ownerRole.save();
+
+    // If admin is creating on behalf of someone else, give admin manager role
+    if (createdBy !== ownerId.toString()) {
+      const adminRole = new UserBusinessRole({
+        userId: new Types.ObjectId(createdBy),
+        businessId: business._id,
+        role: "manager",
+        permissions: ROLE_TO_PERMS.manager,
+      });
+      await adminRole.save();
+    }
+
     return business;
   }
 

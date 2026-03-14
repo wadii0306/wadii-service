@@ -9,6 +9,7 @@ const authRoutes = Router();
 
 authRoutes.post(
   "/register",
+  authMiddleware, // Add to detect admin vs public
   validate("body", userValidationSchemas.register),
   AuthController.register
 );

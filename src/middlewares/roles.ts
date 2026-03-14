@@ -6,7 +6,7 @@ import { User } from "../models/User";
 
 // Updated role types for the new system
 export type RoleSnapshot = {
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions?: string[];
 };
 
@@ -78,6 +78,15 @@ export const PERMS = {
   CONTACT_READ: "contact.read",
   CONTACT_UPDATE: "contact.update",
   CONTACT_DELETE: "contact.delete",
+
+  // Admin panel management
+  ADMIN_PANEL_ACCESS: "admin.panel.access",
+  ADMIN_PANEL_USER_MANAGE: "admin.panel.user.manage",
+  ADMIN_PANEL_BUSINESS_MANAGE: "admin.panel.business.manage",
+  ADMIN_PANEL_ANALYTICS_VIEW: "admin.panel.analytics.view",
+  ADMIN_PANEL_SETTINGS_MANAGE: "admin.panel.settings.manage",
+  ADMIN_PANEL_MARKETING_VIEW: "admin.panel.marketing.view",
+  ADMIN_PANEL_MARKETING_MANAGE: "admin.panel.marketing.manage",
 } as const;
 
 // Role to permissions mapping - easily extensible
@@ -239,6 +248,74 @@ export const ROLE_TO_PERMS = {
     "contact.update",
     "contact.delete",
   ],
+
+  // ADMIN: Full system access like developer + admin panel access
+  admin: [
+    // All existing permissions (like developer)
+    "user.create",
+    "user.read",
+    "user.update",
+    "user.delete",
+    "business.create",
+    "business.read",
+    "business.update",
+    "business.delete",
+    "venue.create",
+    "venue.read",
+    "venue.update",
+    "venue.delete",
+    "package.create",
+    "package.read",
+    "package.update",
+    "package.delete",
+    "vendor.create",
+    "vendor.read",
+    "vendor.update",
+    "vendor.delete",
+    "booking.create",
+    "booking.read",
+    "booking.update",
+    "booking.delete",
+    "notes.create",
+    "notes.read",
+    "notes.update",
+    "notes.delete",
+    "timeslot.create",
+    "timeslot.read",
+    "timeslot.update",
+    "timeslot.delete",
+    "manager.create",
+    "manager.read",
+    "manager.assign",
+    "manager.update",
+    "manager.delete",
+    "lead.create",
+    "lead.read",
+    "lead.assign",
+    "lead.update",
+    "lead.delete",
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
+    // Admin panel specific permissions
+    "admin.panel.access",
+    "admin.panel.user.manage",
+    "admin.panel.business.manage",
+    "admin.panel.analytics.view",
+    "admin.panel.settings.manage",
+    "admin.panel.marketing.view",
+    "admin.panel.marketing.manage",
+  ],
+
+  // MARKETING: Admin panel access only (limited)
+  marketing: [
+    // Admin panel access with limited permissions
+    "admin.panel.access",
+    "admin.panel.analytics.view",
+    "admin.panel.marketing.view",
+    "admin.panel.marketing.manage",
+  ],
 } as const;
 
 const oid = (id: string | Types.ObjectId) =>
@@ -247,8 +324,8 @@ const oid = (id: string | Types.ObjectId) =>
 const hasPerm = (role?: RoleSnapshot, perm?: string): boolean => {
   if (!role) return false;
 
-  // DEVELOPER has full access
-  if (role.role === "developer") return true;
+  // DEVELOPER and ADMIN have full access
+  if (role.role === "developer" || role.role === "admin") return true;
 
   if (!perm) return false;
 
@@ -435,48 +512,62 @@ export async function rolesMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> {
   try {
-    const extReq = req as any;
+    console.log('[ROLES] Roles middleware called for:', req.path);
+    console.log('[ROLES] req.user:', req.user);
+    console.log('[ROLES] req.userRole already exists:', !!req.userRole);
 
-    // If already set (e.g., by a previous middleware), skip
-    if (extReq.userRole) {
+    // Skip if userRole already resolved (e.g., by earlier middleware)
+    if (req.userRole) {
+      console.log('[ROLES] Using existing userRole:', req.userRole);
       return next();
     }
 
-    if (!extReq.user?.userId) {
+    if (!req.user?.userId) {
+      console.log('[ROLES] No userId in req.user');
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    // Check if user is a developer - grant full access
-    if (extReq.user?.role === "developer") {
-      extReq.userRole = {
-        role: "developer",
+    // Check if user is a developer or admin - grant full access
+    console.log('[ROLES] Checking user role:', req.user.role);
+    if (req.user?.role === "developer" || req.user?.role === "admin") {
+      console.log('[ROLES] User is admin/developer, granting full access');
+      req.userRole = {
+        role: req.user.role as "developer" | "admin",
         permissions: ["*"],
       };
+      console.log('[ROLES] Set userRole:', req.userRole);
       return next();
     }
 
+    console.log('[ROLES] User is not admin/developer, checking business roles...');
     const businessId = await resolveBusinessId(req);
 
     if (!businessId) {
+      console.log('[ROLES] No businessId found, proceeding without role');
       return next();
     }
 
+    console.log('[ROLES] Looking for business role:', { userId: req.user.userId, businessId });
     const roleDoc = await UserBusinessRole.findOne({
-      userId: oid(extReq.user.userId),
+      userId: oid(req.user.userId),
       businessId: oid(businessId),
     })
       .select("role permissions")
       .lean();
 
     if (roleDoc) {
-      extReq.userRole = {
+      console.log('[ROLES] Found business role:', roleDoc);
+      req.userRole = {
         role: roleDoc.role,
         permissions: roleDoc.permissions ?? [],
       };
+    } else {
+      console.log('[ROLES] No business role found');
     }
 
+    console.log('[ROLES] Final userRole:', req.userRole);
     return next();
   } catch (err: any) {
     console.error("Error in rolesMiddleware:", err);
@@ -497,10 +588,15 @@ export function requirePerm(perm: string | string[]) {
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log('[REQUIRE_PERM] Permission check for:', perms);
+      console.log('[REQUIRE_PERM] req.user:', req.user);
+      console.log('[REQUIRE_PERM] req.userRole:', (req as any).userRole);
+      
       const extReq = req as any;
 
       // Check user presence
       if (!extReq.user?.userId) {
+        console.log('[REQUIRE_PERM] No userId in request');
         return res
           .status(401)
           .json({ success: false, message: "Unauthorized" });
@@ -508,9 +604,12 @@ export function requirePerm(perm: string | string[]) {
 
       // Ensure userRole is present (if not, fetch)
       if (!extReq.userRole) {
+        console.log('[REQUIRE_PERM] No userRole, attempting to resolve...');
         const businessId = await resolveBusinessId(req);
+        console.log('[REQUIRE_PERM] Resolved businessId:', businessId);
 
         if (businessId) {
+          console.log('[REQUIRE_PERM] Looking up business role for:', { userId: extReq.user.userId, businessId });
           const roleDoc = await UserBusinessRole.findOne({
             userId: oid(extReq.user.userId),
             businessId: oid(businessId),
@@ -519,31 +618,43 @@ export function requirePerm(perm: string | string[]) {
             .lean();
 
           if (roleDoc) {
+            console.log('[REQUIRE_PERM] Found business role:', roleDoc);
             extReq.userRole = {
               role: roleDoc.role,
               permissions: roleDoc.permissions ?? [],
             } as RoleSnapshot;
+          } else {
+            console.log('[REQUIRE_PERM] No business role found');
           }
+        } else {
+          console.log('[REQUIRE_PERM] No businessId, checking global admin role...');
         }
       }
 
-      // Developer bypass
-      if (extReq.userRole?.role === "developer") {
+      // Developer and Admin bypass
+      const userRole = extReq.userRole?.role || extReq.user?.role;
+      console.log('[REQUIRE_PERM] Checking admin bypass for role:', userRole);
+      if (extReq.userRole?.role === "developer" || extReq.userRole?.role === "admin" || userRole === "admin") {
+        console.log('[REQUIRE_PERM] Admin/Developer bypass granted');
         return next();
       }
 
       // Permission check
+      console.log('[REQUIRE_PERM] Checking permissions for role:', extReq.userRole);
       const ok = perms.every((p) =>
         hasPerm(extReq.userRole as RoleSnapshot | undefined, p)
       );
 
+      console.log('[REQUIRE_PERM] Permission check result:', ok);
       if (!ok) {
+        console.log('[REQUIRE_PERM] Permission denied - missing perms:', perms);
         return res.status(403).json({
           success: false,
           message: "Forbidden: insufficient permissions",
         });
       }
 
+      console.log('[REQUIRE_PERM] Permission granted');
       return next();
     } catch (err: any) {
       console.error("Error in requirePerm:", err);
@@ -560,7 +671,7 @@ export const RoleHelper = {
    * Check if a role has a specific permission
    */
   hasPermission(role: string, permission: string): boolean {
-    if (role === "developer") return true;
+    if (role === "developer" || role === "admin") return true;
     const rolePerms = ROLE_TO_PERMS[
       role as keyof typeof ROLE_TO_PERMS
     ] as readonly string[];
@@ -571,7 +682,7 @@ export const RoleHelper = {
    * Get all permissions for a role
    */
   getPermissionsForRole(role: string): string[] {
-    if (role === "developer") {
+    if (role === "developer" || role === "admin") {
       return Object.values(PERMS);
     }
     return [...(ROLE_TO_PERMS[role as keyof typeof ROLE_TO_PERMS] || [])];
@@ -585,7 +696,7 @@ export const RoleHelper = {
     requiredBusinessId?: string
   ): boolean {
     if (!userRole) return false;
-    if (userRole.role === "developer") return true;
+    if (userRole.role === "developer" || userRole.role === "admin") return true;
     // For now, all business-scoped roles can access their business
     // Future: implement business-specific access control
     return true;

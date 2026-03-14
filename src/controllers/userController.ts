@@ -17,6 +17,18 @@ export class AuthController {
   static async register(req: RegisterReq, res: Response): Promise<void> {
     try {
       const result = await AuthService.register(req.body);
+      
+      // If admin is creating user, don't return token (admin stays logged in)
+      if (req.user?.role === "admin" || req.user?.role === "developer") {
+        res.status(201).json({
+          success: true,
+          message: "User created successfully",
+          data: { user: result.user },
+        });
+        return;
+      }
+      
+      // Public signup - return token for new user
       res.status(201).json({
         success: true,
         message: "User registered successfully",

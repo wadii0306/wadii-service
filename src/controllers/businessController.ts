@@ -14,6 +14,9 @@ export class BusinessController {
     res: Response
   ) {
     try {
+      console.log("BusinessController.createBusiness - REQ BODY OWNER:", req.body.ownerId);
+      console.log("BusinessController.createBusiness - REQ USER:", req.user?.userId);
+      
       if (!req.user?.userId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
