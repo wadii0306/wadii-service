@@ -7,14 +7,34 @@ import { authMiddleware } from "../middlewares/auth";
 import { rolesMiddleware, requirePerm, ROLE_PERMS } from "../middlewares/roles";
 import { validate } from "../middlewares/validate";
 import { businessValidationSchemas, objectId } from "../utils/validator";
+import { upload } from "../middlewares/upload";
 
 const businessRoutes = Router();
 
 // All business routes require authentication + role snapshot
 businessRoutes.use(authMiddleware, rolesMiddleware);
 
+// Note: Multer will be added later when package is installed
+// For now, we'll add the routes structure without file upload
+
 // ----- Schemas for params -----
 const paramsWithBusinessId = z.object({ businessId: objectId });
+const paramsWithLogoId = z.object({ 
+  businessId: objectId, 
+  logoId: z.string().min(1, 'Logo ID is required')
+});
+
+// Logo validation schemas
+const logoUploadSchema = z.object({
+  name: z.string().min(1, 'Logo name is required'),
+  type: z.enum(['primary', 'secondary', 'favicon', 'watermark'])
+});
+
+const logoUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  type: z.enum(['primary', 'secondary', 'favicon', 'watermark']).optional(),
+  isActive: z.boolean().optional()
+});
 
 // Create business — any authenticated user
 businessRoutes.post(
@@ -49,6 +69,49 @@ businessRoutes.delete(
   validate("params", paramsWithBusinessId),
   requirePerm([ROLE_PERMS.BUSINESS_DELETE]), // Only developer can delete, or custom logic in controller
   BusinessController.deleteBusiness
+);
+
+// ----- Logo Management Routes -----
+
+// Upload logo with multer middleware
+businessRoutes.post(
+  "/:businessId/logos",
+  upload.single("file"),
+  validate("params", paramsWithBusinessId),
+  validate("body", logoUploadSchema),
+  requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
+  BusinessController.uploadLogo
+);
+
+// Get all logos for a business
+businessRoutes.get(
+  "/:businessId/logos",
+  validate("params", paramsWithBusinessId),
+  BusinessController.getLogos
+);
+
+// Get logos by type (filtered)
+businessRoutes.get(
+  "/:businessId/logos",
+  validate("params", paramsWithBusinessId),
+  BusinessController.getLogos
+);
+
+// Update logo
+businessRoutes.put(
+  "/:businessId/logos/:logoId",
+  validate("params", paramsWithLogoId),
+  validate("body", logoUpdateSchema),
+  requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
+  BusinessController.updateLogo
+);
+
+// Remove logo
+businessRoutes.delete(
+  "/:businessId/logos/:logoId",
+  validate("params", paramsWithLogoId),
+  requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
+  BusinessController.removeLogo
 );
 
 export default businessRoutes;

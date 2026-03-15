@@ -57,11 +57,38 @@ const businessSchema = new Schema<IBusiness>(
       },
     ],
     branding: {
-      logoUrl: {
+  logos: [
+    {
+      url: {
         type: String,
-        default: null,
+        required: true,
+        trim: true
       },
-    },
+      publicId: {
+        type: String,
+        required: true
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      type: {
+        type: String,
+        enum: ["primary", "secondary", "favicon", "watermark"],
+        required: true
+      },
+      isActive: {
+        type: Boolean,
+        default: true
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ]
+},
     qrCode: {
       type: String,
       default: null,

@@ -9,6 +9,11 @@ interface IEnvironmentConfig {
   JWT_SECRET: string;
   JWT_EXPIRE: string;
   BCRYPT_ROUNDS: number;
+  cloudinary: {
+    cloudName: string;
+    apiKey: string;
+    apiSecret: string;
+  };
 }
 
 class EnvironmentConfig {
@@ -24,6 +29,11 @@ class EnvironmentConfig {
       JWT_SECRET: process.env.JWT_SECRET || "your-super-secret-jwt-key",
       JWT_EXPIRE: process.env.JWT_EXPIRE || "7d",
       BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || "12", 10),
+      cloudinary: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+        apiKey: process.env.CLOUDINARY_API_KEY || "",
+        apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+      },
     };
   }
 

@@ -1,5 +1,11 @@
 import { Document, Types } from "mongoose";
 
+export type LogoType =
+  | "primary"
+  | "secondary"
+  | "favicon"
+  | "watermark";
+
 export interface IUser extends Document<Types.ObjectId> {
   _id: Types.ObjectId;
   email: string;
@@ -30,7 +36,17 @@ export interface IBusiness extends Document<Types.ObjectId> {
   };
   website?: string | null;
   socials?: { name: string; url: string }[];
-  branding: { logoUrl?: string | null };
+  branding: { 
+    logos: Array<{
+      _id?: Types.ObjectId;
+      url: string;
+      publicId: string;
+      name: string;        // "Primary Logo", "Favicon", "Watermark"
+      type: LogoType;        // "primary", "secondary", "favicon"
+      isActive: boolean;
+      uploadedAt: Date;
+    }>
+  };
   qrCode?: string | null;
 
   status: "inactive" | "active";

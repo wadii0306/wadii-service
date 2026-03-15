@@ -514,42 +514,31 @@ export async function rolesMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    console.log('[ROLES] Roles middleware called for:', req.path);
-    console.log('[ROLES] req.user:', req.user);
-    console.log('[ROLES] req.userRole already exists:', !!req.userRole);
-
     // Skip if userRole already resolved (e.g., by earlier middleware)
     if (req.userRole) {
-      console.log('[ROLES] Using existing userRole:', req.userRole);
       return next();
     }
 
     if (!req.user?.userId) {
-      console.log('[ROLES] No userId in req.user');
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
     }
 
     // Check if user is a developer or admin - grant full access
-    console.log('[ROLES] Checking user role:', req.user.role);
     if (req.user?.role === "developer" || req.user?.role === "admin") {
-      console.log('[ROLES] User is admin/developer, granting full access');
       req.userRole = {
         role: req.user.role as "developer" | "admin",
         permissions: ["*"],
-      };
-      console.log('[ROLES] Set userRole:', req.userRole);
+      } as RoleSnapshot;
       return next();
     }
 
-    console.log('[ROLES] User is not admin/developer, checking business roles...');
     const businessId = await resolveBusinessId(req);
 
     if (!businessId) {
-      console.log('[ROLES] No businessId found, proceeding without role');
       return next();
     }
 
-    console.log('[ROLES] Looking for business role:', { userId: req.user.userId, businessId });
     const roleDoc = await UserBusinessRole.findOne({
       userId: oid(req.user.userId),
       businessId: oid(businessId),
@@ -558,22 +547,17 @@ export async function rolesMiddleware(
       .lean();
 
     if (roleDoc) {
-      console.log('[ROLES] Found business role:', roleDoc);
       req.userRole = {
-        role: roleDoc.role,
+        role: roleDoc.role as "developer" | "owner" | "manager",
         permissions: roleDoc.permissions ?? [],
       };
-    } else {
-      console.log('[ROLES] No business role found');
     }
 
-    console.log('[ROLES] Final userRole:', req.userRole);
     return next();
   } catch (err: any) {
     console.error("Error in rolesMiddleware:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to resolve user role" });
+    res.status(500).json({ success: false, message: "Failed to resolve user role" });
+    return;
   }
 }
 
@@ -588,15 +572,10 @@ export function requirePerm(perm: string | string[]) {
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log('[REQUIRE_PERM] Permission check for:', perms);
-      console.log('[REQUIRE_PERM] req.user:', req.user);
-      console.log('[REQUIRE_PERM] req.userRole:', (req as any).userRole);
-      
       const extReq = req as any;
 
       // Check user presence
       if (!extReq.user?.userId) {
-        console.log('[REQUIRE_PERM] No userId in request');
         return res
           .status(401)
           .json({ success: false, message: "Unauthorized" });
@@ -604,12 +583,9 @@ export function requirePerm(perm: string | string[]) {
 
       // Ensure userRole is present (if not, fetch)
       if (!extReq.userRole) {
-        console.log('[REQUIRE_PERM] No userRole, attempting to resolve...');
         const businessId = await resolveBusinessId(req);
-        console.log('[REQUIRE_PERM] Resolved businessId:', businessId);
 
         if (businessId) {
-          console.log('[REQUIRE_PERM] Looking up business role for:', { userId: extReq.user.userId, businessId });
           const roleDoc = await UserBusinessRole.findOne({
             userId: oid(extReq.user.userId),
             businessId: oid(businessId),
@@ -618,43 +594,32 @@ export function requirePerm(perm: string | string[]) {
             .lean();
 
           if (roleDoc) {
-            console.log('[REQUIRE_PERM] Found business role:', roleDoc);
             extReq.userRole = {
               role: roleDoc.role,
               permissions: roleDoc.permissions ?? [],
             } as RoleSnapshot;
-          } else {
-            console.log('[REQUIRE_PERM] No business role found');
           }
-        } else {
-          console.log('[REQUIRE_PERM] No businessId, checking global admin role...');
         }
       }
 
       // Developer and Admin bypass
       const userRole = extReq.userRole?.role || extReq.user?.role;
-      console.log('[REQUIRE_PERM] Checking admin bypass for role:', userRole);
       if (extReq.userRole?.role === "developer" || extReq.userRole?.role === "admin" || userRole === "admin") {
-        console.log('[REQUIRE_PERM] Admin/Developer bypass granted');
         return next();
       }
 
       // Permission check
-      console.log('[REQUIRE_PERM] Checking permissions for role:', extReq.userRole);
       const ok = perms.every((p) =>
         hasPerm(extReq.userRole as RoleSnapshot | undefined, p)
       );
 
-      console.log('[REQUIRE_PERM] Permission check result:', ok);
       if (!ok) {
-        console.log('[REQUIRE_PERM] Permission denied - missing perms:', perms);
         return res.status(403).json({
           success: false,
           message: "Forbidden: insufficient permissions",
         });
       }
 
-      console.log('[REQUIRE_PERM] Permission granted');
       return next();
     } catch (err: any) {
       console.error("Error in requirePerm:", err);

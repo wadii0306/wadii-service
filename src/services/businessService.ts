@@ -1,9 +1,11 @@
 import { Document, Types } from "mongoose";
 import { Business } from "../models/Business";
 import { UserBusinessRole } from "../models/UserBusinessRole";
-import { IBusiness, IUserBusinessRole } from "../types";
+import { IBusiness, IUserBusinessRole, LogoType } from "../types";
 import { ROLE_TO_PERMS } from "../middlewares/roles";
 import QRCode from "qrcode";
+import { uploadImage } from "../utils/cloudinary";
+import fs from "fs";
 
 export type RoleSnapshot = {
   role: "developer" | "owner" | "manager";
@@ -26,7 +28,15 @@ export interface ICreateBusinessData {
   };
   website?: string;
   socials?: { name: string; url: string }[];
-  branding?: { logoUrl?: string };
+  branding?: { 
+    logos?: Array<{
+      url: string;
+      name: string;
+      type: LogoType;
+      isActive: boolean;
+      uploadedAt: Date;
+    }>
+  };
 }
 
 export class BusinessService {
@@ -210,6 +220,7 @@ export class BusinessService {
 
       const canUpdate =
         role?.role === "owner" ||
+        role?.role === "manager" ||
         (Array.isArray(role?.permissions) &&
           role!.permissions.includes("business.update"));
 
@@ -248,5 +259,232 @@ export class BusinessService {
       { new: true }
     );
   }
+
+  /**
+   * Add logo to business
+   */
+  public static async addLogo(
+    businessId: string,
+    logoData: {
+      url: string;
+      publicId: string;
+      name: string;
+      type: LogoType;
+    },
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    const newLogo = {
+      url: logoData.url,
+      publicId: logoData.publicId,
+      name: logoData.name,
+      type: logoData.type,
+      isActive: true,
+      uploadedAt: new Date(),
+    };
+
+    console.log("=== Logo Debug ===");
+    console.log("newLogo:", newLogo);
+    console.log("typeof newLogo:", typeof newLogo);
+    console.log("==================");
+
+    return Business.findOneAndUpdate(
+      { _id: new Types.ObjectId(businessId), isDeleted: false },
+      { 
+        $push: { "branding.logos": newLogo },
+        updatedBy: userId
+      },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Upload logo and add to business
+   */
+  public static async uploadAndAddLogo(
+    businessId: string,
+    file: any, // Multer file object
+    logoData: {
+      name: string;
+      type: LogoType;
+    },
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions first
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    // Upload image to Cloudinary
+    const uploadResult = await uploadImage(file.path, `business-logos/${businessId}`);
+    
+    // Delete temp file after successful upload
+    try {
+      fs.unlinkSync(file.path);
+    } catch (error) {
+      console.warn("Failed to delete temp file:", error);
+    }
+    
+    // Add logo to business
+    return this.addLogo(
+      businessId,
+      {
+        url: uploadResult.url,
+        publicId: uploadResult.publicId,
+        name: logoData.name,
+        type: logoData.type,
+      },
+      userId,
+      userRole
+    );
+  }
+
+  /**
+   * Update logo (change name, type, or active status)
+   */
+  public static async updateLogo(
+    businessId: string,
+    logoId: string,
+    updateData: {
+      name?: string;
+      type?: LogoType;
+      isActive?: boolean;
+    },
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    const updateFields: any = { updatedBy: userId };
+    
+    if (updateData.name) {
+      updateFields["branding.logos.$.name"] = updateData.name;
+    }
+    if (updateData.type) {
+      updateFields["branding.logos.$.type"] = updateData.type;
+    }
+    if (updateData.isActive !== undefined) {
+      updateFields["branding.logos.$.isActive"] = updateData.isActive;
+    }
+
+    return Business.findOneAndUpdate(
+      { 
+        _id: new Types.ObjectId(businessId), 
+        isDeleted: false,
+        "branding.logos._id": logoId 
+      },
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Remove logo from business
+   */
+  public static async removeLogo(
+    businessId: string,
+    logoId: string,
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    return Business.findOneAndUpdate(
+      { 
+        _id: new Types.ObjectId(businessId), 
+        isDeleted: false 
+      },
+      { 
+        $pull: { "branding.logos": { _id: logoId } },
+        updatedBy: userId
+      },
+      { new: true }
+    );
+  }
+
+  /**
+   * Get active logos for a business
+   */
+  public static async getActiveLogos(
+    businessId: string,
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<Array<{ url: string; name: string; type: LogoType; uploadedAt: Date }>> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      if (!role) throw new Error("Access denied to this business");
+    }
+
+    const business = await Business.findOne({
+      _id: new Types.ObjectId(businessId),
+      isDeleted: false,
+    }).select("branding.logos").lean();
+
+    if (!business || !business.branding?.logos) return [];
+
+    return business.branding.logos
+      .filter(logo => logo.isActive)
+      .map(({ url, name, type, uploadedAt }) => ({ url, name, type, uploadedAt }));
+  }
 }
-   
