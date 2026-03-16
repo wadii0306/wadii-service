@@ -31,9 +31,14 @@ const logoUploadSchema = z.object({
 });
 
 const logoUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: z.enum(['primary', 'secondary', 'favicon', 'watermark']).optional(),
-  isActive: z.boolean().optional()
+  name: z.string().min(1).max(100).optional(),
+  type: z.enum(["primary", "secondary", "favicon", "watermark"]).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const policyUpdateSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  content: z.string().min(10, "Content must be at least 10 characters long"),
 });
 
 // Create business — any authenticated user
@@ -112,6 +117,36 @@ businessRoutes.delete(
   validate("params", paramsWithLogoId),
   requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
   BusinessController.removeLogo
+);
+
+// Terms & Conditions Routes
+businessRoutes.put(
+  "/:businessId/terms",
+  validate("params", paramsWithBusinessId),
+  validate("body", policyUpdateSchema),
+  requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
+  BusinessController.updateTermsAndConditions
+);
+
+businessRoutes.get(
+  "/:businessId/terms",
+  validate("params", paramsWithBusinessId),
+  BusinessController.getTermsAndConditions
+);
+
+// Payment Policy Routes
+businessRoutes.put(
+  "/:businessId/payment-policy",
+  validate("params", paramsWithBusinessId),
+  validate("body", policyUpdateSchema),
+  requirePerm(ROLE_PERMS.BUSINESS_UPDATE),
+  BusinessController.updatePaymentPolicy
+);
+
+businessRoutes.get(
+  "/:businessId/payment-policy",
+  validate("params", paramsWithBusinessId),
+  BusinessController.getPaymentPolicy
 );
 
 export default businessRoutes;

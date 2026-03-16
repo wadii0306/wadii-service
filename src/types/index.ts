@@ -48,6 +48,18 @@ export interface IBusiness extends Document<Types.ObjectId> {
     }>
   };
   qrCode?: string | null;
+  termsAndConditions: {
+    title: string;
+    content: string;
+    lastUpdated: Date;
+    updatedBy?: string | null;
+  };
+  paymentPolicy: {
+    title: string;
+    content: string;
+    lastUpdated: Date;
+    updatedBy?: string | null;
+  };
 
   status: "inactive" | "active";
   isDeleted: boolean;

@@ -395,4 +395,160 @@ export class BusinessController {
       res.status(400).json({ success: false, message: error.message });
     }
   }
+
+  // Terms & Conditions Endpoints
+
+  static async updateTermsAndConditions(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const { businessId } = req.params;
+      const { title, content } = req.body;
+
+      if (!content || content.trim() === "") {
+        res.status(400).json({ 
+          success: false, 
+          message: "Terms and conditions content is required" 
+        });
+        return;
+      }
+
+      const business = await BusinessService.updateTermsAndConditions(
+        businessId,
+        { title, content },
+        req.user.userId,
+        req.userRole
+      );
+
+      if (!business) {
+        res.status(404).json({ success: false, message: "Business not found" });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Terms and conditions updated successfully",
+        data: business.termsAndConditions,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getTermsAndConditions(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const { businessId } = req.params;
+
+      const terms = await BusinessService.getTermsAndConditions(
+        businessId,
+        req.user.userId,
+        req.userRole
+      );
+
+      if (!terms) {
+        res.status(404).json({ success: false, message: "Business not found" });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Terms and conditions retrieved successfully",
+        data: terms,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  // Payment Policy Endpoints
+
+  static async updatePaymentPolicy(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const { businessId } = req.params;
+      const { title, content } = req.body;
+
+      if (!content || content.trim() === "") {
+        res.status(400).json({ 
+          success: false, 
+          message: "Payment policy content is required" 
+        });
+        return;
+      }
+
+      const business = await BusinessService.updatePaymentPolicy(
+        businessId,
+        { title, content },
+        req.user.userId,
+        req.userRole
+      );
+
+      if (!business) {
+        res.status(404).json({ success: false, message: "Business not found" });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Payment policy updated successfully",
+        data: business.paymentPolicy,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  static async getPaymentPolicy(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const { businessId } = req.params;
+
+      const policy = await BusinessService.getPaymentPolicy(
+        businessId,
+        req.user.userId,
+        req.userRole
+      );
+
+      if (!policy) {
+        res.status(404).json({ success: false, message: "Business not found" });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Payment policy retrieved successfully",
+        data: policy,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
 }

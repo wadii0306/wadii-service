@@ -261,6 +261,166 @@ export class BusinessService {
   }
 
   /**
+   * Update business terms and conditions
+   */
+  public static async updateTermsAndConditions(
+    businessId: string,
+    termsData: {
+      title?: string;
+      content: string;
+    },
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    const updateData: any = {
+      "termsAndConditions.content": termsData.content,
+      "termsAndConditions.lastUpdated": new Date(),
+      "termsAndConditions.updatedBy": userId,
+      updatedBy: userId
+    };
+
+    if (termsData.title) {
+      updateData["termsAndConditions.title"] = termsData.title;
+    }
+
+    return Business.findOneAndUpdate(
+      { _id: new Types.ObjectId(businessId), isDeleted: false },
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Update business payment policy
+   */
+  public static async updatePaymentPolicy(
+    businessId: string,
+    policyData: {
+      title?: string;
+      content: string;
+    },
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<IBusiness | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const role = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      const canUpdate =
+        role?.role === "owner" ||
+        role?.role === "manager" ||
+        (Array.isArray(role?.permissions) &&
+          role!.permissions.includes("business.update"));
+
+      if (!canUpdate) throw new Error("Permission denied");
+    }
+
+    const updateData: any = {
+      "paymentPolicy.content": policyData.content,
+      "paymentPolicy.lastUpdated": new Date(),
+      "paymentPolicy.updatedBy": userId,
+      updatedBy: userId
+    };
+
+    if (policyData.title) {
+      updateData["paymentPolicy.title"] = policyData.title;
+    }
+
+    return Business.findOneAndUpdate(
+      { _id: new Types.ObjectId(businessId), isDeleted: false },
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+  }
+
+  /**
+   * Get business terms and conditions
+   */
+  public static async getTermsAndConditions(
+    businessId: string,
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<{ title: string; content: string; lastUpdated: Date } | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const hasAccess = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      if (!hasAccess) throw new Error("Access denied to this business");
+    }
+
+    const business = await Business.findOne({
+      _id: new Types.ObjectId(businessId),
+      isDeleted: false,
+    })
+      .select("termsAndConditions")
+      .lean();
+
+    if (!business || !business.termsAndConditions) return null;
+
+    return {
+      title: business.termsAndConditions.title,
+      content: business.termsAndConditions.content,
+      lastUpdated: business.termsAndConditions.lastUpdated
+    };
+  }
+
+  /**
+   * Get business payment policy
+   */
+  public static async getPaymentPolicy(
+    businessId: string,
+    userId: string,
+    userRole?: RoleSnapshot
+  ): Promise<{ title: string; content: string; lastUpdated: Date } | null> {
+    // Check permissions
+    if (userRole?.role !== "developer") {
+      const hasAccess = await UserBusinessRole.findOne({
+        userId: new Types.ObjectId(userId),
+        businessId: new Types.ObjectId(businessId),
+      }).lean();
+
+      if (!hasAccess) throw new Error("Access denied to this business");
+    }
+
+    const business = await Business.findOne({
+      _id: new Types.ObjectId(businessId),
+      isDeleted: false,
+    })
+      .select("paymentPolicy")
+      .lean();
+
+    if (!business || !business.paymentPolicy) return null;
+
+    return {
+      title: business.paymentPolicy.title,
+      content: business.paymentPolicy.content,
+      lastUpdated: business.paymentPolicy.lastUpdated
+    };
+  }
+
+  /**
    * Add logo to business
    */
   public static async addLogo(

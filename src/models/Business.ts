@@ -93,6 +93,42 @@ const businessSchema = new Schema<IBusiness>(
       type: String,
       default: null,
     },
+    termsAndConditions: {
+      title: {
+        type: String,
+        default: "Terms and Conditions"
+      },
+      content: {
+        type: String,
+        default: ""
+      },
+      lastUpdated: {
+        type: Date,
+        default: Date.now
+      },
+      updatedBy: {
+        type: String,
+        default: null
+      }
+    },
+    paymentPolicy: {
+      title: {
+        type: String,
+        default: "Payment Policy"
+      },
+      content: {
+        type: String,
+        default: ""
+      },
+      lastUpdated: {
+        type: Date,
+        default: Date.now
+      },
+      updatedBy: {
+        type: String,
+        default: null
+      }
+    },
     status: {
       type: String,
       enum: ["inactive", "active"],
