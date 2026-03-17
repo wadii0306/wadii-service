@@ -10,12 +10,24 @@ const UserSchema = new Schema(
       unique: true,
       index: true,
     },
-    password: { type: String, required: true, select: false },
+    password: { 
+      type: String, 
+      required: function() {
+        // Password is required unless user has Google ID
+        return !this.googleId;
+      },
+      select: false 
+    },
     mustChangePassword: { type: Boolean, required: true, default: false }, // 👈 default false for self-registration
 
     firstName: { type: String, required: true },
     lastName: { type: String },
     phone: { type: String, default: null },
+    
+    // Google OAuth fields
+    googleId: { type: String, default: null },
+    googleProfilePicture: { type: String, default: null },
+    isEmailVerified: { type: Boolean, default: false },
 
     role: {
       type: String,

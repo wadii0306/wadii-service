@@ -10,11 +10,14 @@ export interface IUser extends Document<Types.ObjectId> {
   _id: Types.ObjectId;
   email: string;
   password: string;
+  mustChangePassword: boolean;
   firstName: string;
   lastName: string;
-  phone?: string | null;
+  phone?: string;
+  googleId?: string;
+  googleProfilePicture?: string;
+  isEmailVerified: boolean;
   role: "developer" | "owner" | "manager" | "admin" | "marketing";
-  mustChangePassword?: boolean;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: Types.ObjectId | string;
