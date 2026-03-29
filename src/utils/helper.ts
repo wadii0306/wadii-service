@@ -26,9 +26,22 @@ export function parseNumberParam(
  */
 export function recalcFoodPackage(pkg: any, venuePackageConfig?: any) {
   let sectionTotals = 0;
-  const basePackagePrice = venuePackageConfig?.price || 0;
+  const basePackagePrice = venuePackageConfig?.price || pkg.defaultPrice || 0;
+  
+  // NEW: Check if we should use default pricing (no customization or no sections)
+  if (!pkg.isCustomised || !pkg.sections || pkg.sections.length === 0) {
+    // Use default package pricing - no section calculations needed
+    pkg.totalPricePerPerson = basePackagePrice;
+    
+    // Ensure sections are properly initialized
+    if (!pkg.sections) {
+      pkg.sections = [];
+    }
+    
+    return pkg;
+  }
 
-  // Create a map of section configurations from venue package for easy lookup
+  // EXISTING: Custom pricing logic - calculate from sections
   const sectionConfigMap = new Map();
   if (venuePackageConfig?.menuSections) {
     venuePackageConfig.menuSections.forEach((menuSection: any) => {

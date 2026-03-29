@@ -37,6 +37,72 @@ export class LeadService {
         }
       }
 
+      // NEW: Always create foodPackage for consistency
+      if (!leadData.foodPackage) {
+        // Create foodPackage from simple package or empty structure
+        if (leadData.package) {
+          // User selected simple package - convert to foodPackage structure
+          let venuePackageConfig = null;
+          if (leadData.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(leadData.venueId).lean();
+            if (venue?.foodPackages) {
+              venuePackageConfig = venue.foodPackages.find(
+                (pkg: any) =>
+                  pkg._id?.toString() ===
+                  leadData.package._id?.toString()
+              );
+            }
+          }
+          
+          if (venuePackageConfig) {
+            leadData.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: venuePackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: venuePackageConfig.price || 0,
+              totalPricePerPerson: venuePackageConfig.price || 0,
+              inclusions: venuePackageConfig.inclusions || []
+            };
+          }
+        } else {
+          // No package selected - use venue's default package or create empty
+          let defaultPackageConfig = null;
+          if (leadData.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(leadData.venueId).lean();
+            if (venue?.foodPackages && venue.foodPackages.length > 0) {
+              // Use the first package as default
+              defaultPackageConfig = venue.foodPackages[0];
+            }
+          }
+          
+          if (defaultPackageConfig) {
+            leadData.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: defaultPackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: defaultPackageConfig.price || 0,
+              totalPricePerPerson: defaultPackageConfig.price || 0,
+              inclusions: defaultPackageConfig.inclusions || []
+            };
+          } else {
+            // No packages available - create empty foodPackage
+            leadData.foodPackage = {
+              sourcePackageId: undefined,
+              name: "No Package",
+              isCustomised: false,
+              sections: [],
+              defaultPrice: 0,
+              totalPricePerPerson: 0,
+              inclusions: []
+            };
+          }
+        }
+      }
+
       // if (leadData.foodPackage) {
       //   // Fetch venue package configuration if sourcePackageId is provided
       //   let venuePackageConfig = null;
@@ -178,6 +244,45 @@ export class LeadService {
         .populate("venueId", "venueName venueType")
         .populate("createdBy", "_id email firstName lastName")
         .populate("updatedBy", "_id email firstName lastName");
+
+      // Ensure all leads have foodPackage structure
+      for (const lead of leads) {
+        if (!lead.foodPackage) {
+          // Try to get venue's default package
+          let defaultPackageConfig = null;
+          if (lead.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(lead.venueId).lean();
+            if (venue?.foodPackages && venue.foodPackages.length > 0) {
+              // Use the first package as default
+              defaultPackageConfig = venue.foodPackages[0];
+            }
+          }
+          
+          if (defaultPackageConfig) {
+            lead.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: defaultPackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: defaultPackageConfig.price || 0,
+              totalPricePerPerson: defaultPackageConfig.price || 0,
+              inclusions: defaultPackageConfig.inclusions || []
+            };
+          } else {
+            // No packages available - create empty foodPackage
+            lead.foodPackage = {
+              sourcePackageId: undefined,
+              name: "No Package",
+              isCustomised: false,
+              sections: [],
+              defaultPrice: 0,
+              totalPricePerPerson: 0,
+              inclusions: []
+            };
+          }
+        }
+      }
 
       console.log(
         `Fetched ${leads.length} leads for venue ${venueId} with filters:`,

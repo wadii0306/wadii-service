@@ -192,7 +192,7 @@ const leadSchema = new Schema<ILead>(
     },
     email: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       lowercase: true,
     },

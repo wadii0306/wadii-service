@@ -34,9 +34,21 @@ const foodPackageSchema = z.object({
   inclusions: z.array(z.string()).optional().default([]),
   sections: z
     .array(foodSectionSchema)
-    .min(1, 'At least one section is required'),
+    .optional()
+    .default([]), // Allow empty sections for default package pricing
   totalPricePerPerson: z.number().min(0).default(0),
   defaultPrice: z.number().min(0).optional(),
+}).refine((data) => {
+  // Either sections must exist OR defaultPrice must be provided for package-only pricing
+  if (data.sections && data.sections.length > 0) {
+    return true; // Valid if sections are provided
+  }
+  if (data.defaultPrice !== undefined && data.defaultPrice >= 0) {
+    return true; // Valid if defaultPrice is provided (package-only pricing)
+  }
+  return false; // Invalid if neither sections nor defaultPrice is provided
+}, {
+  message: "Either sections with items OR defaultPrice must be provided for food package pricing"
 })
 
 /**
@@ -91,7 +103,7 @@ export const createLeadSchema = z
     venueId: objectId,
     clientName: z.string().min(1, "Client name is required"),
     contactNo: z.string().min(1, "Contact number is required"),
-    email: z.string().email("Invalid email format"),
+    email: z.string().email("Invalid email format").optional(),
     occasionType: z.string().min(1, "Occasion type is required"),
     numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
     leadStatus: z.enum(["cold", "warm", "hot"]).default("cold"),
