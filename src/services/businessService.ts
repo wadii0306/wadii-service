@@ -188,6 +188,13 @@ export class BusinessService {
 
     if (!business) return null;
 
+    if (!business.termsAndConditions) {
+      business.termsAndConditions = { title: "Terms and Conditions", content: "" } as any;
+    }
+    if (!business.paymentPolicy) {
+      business.paymentPolicy = { title: "Payment Policy", content: "" } as any;
+    }
+
     const owner = business.ownerId as unknown as {
       firstName?: string;
       lastName?: string;
