@@ -2,6 +2,7 @@ import { Router } from "express";
 import authRoutes from "./userRoutes";
 import businessRoutes from "./businessRoutes";
 import venueRoutes from "./venueRoutes";
+import venueContextRoutes from "./venueContextRoutes";
 import managerRoutes from "./managerRoutes";
 import leadRoutes from "./leadRoutes";
 import bookingRoutes from "./bookingRoutes";
@@ -36,6 +37,7 @@ router.use("/admin", adminRoutes); // Admin-specific routes
 router.use("/businesses", businessRoutes);
 router.use("/venues", venueRoutes);
 router.use("/venues", foodMenuRoutes); // Food menu routes under /venues/:venueId/food-menu
+router.use("/venue-context", venueContextRoutes); // Venue context switching
 router.use("/managers", managerRoutes);
 router.use("/leads", leadRoutes);
 router.use("/bookings", bookingRoutes);

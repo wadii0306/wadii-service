@@ -10,23 +10,26 @@ const UserSchema = new Schema(
       unique: true,
       index: true,
     },
+    
+    // Google OAuth fields (must be defined before password field)
+    googleId: { type: String, default: null },
+    googleProfilePicture: { type: String, default: null },
+    
     password: { 
       type: String, 
-      required: function() {
+      required: function(this: any): boolean {
         // Password is required unless user has Google ID
         return !this.googleId;
       },
       select: false 
     },
+    
     mustChangePassword: { type: Boolean, required: true, default: false }, // 👈 default false for self-registration
 
     firstName: { type: String, required: true },
     lastName: { type: String },
     phone: { type: String, default: null },
     
-    // Google OAuth fields
-    googleId: { type: String, default: null },
-    googleProfilePicture: { type: String, default: null },
     isEmailVerified: { type: Boolean, default: false },
 
     role: {
@@ -34,6 +37,10 @@ const UserSchema = new Schema(
       enum: ["developer", "owner", "manager", "admin", "marketing"],
       default: "owner",
     },
+
+    // Multi-venue context
+    activeBusinessId: { type: Schema.Types.ObjectId, ref: "Business", default: null },
+    activeVenueId: { type: Schema.Types.ObjectId, ref: "Venue", default: null },
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
