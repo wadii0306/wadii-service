@@ -53,6 +53,7 @@ export class ReportService {
       const transactionQuery: any = {
         bookingId: { $in: bookingIds },
         status: "success",
+        direction: "inbound", // ONLY income transactions for debtor report
       };
 
       if (paymentMode) {
@@ -94,14 +95,14 @@ export class ReportService {
         const bookingId = booking._id.toString();
         const bookingTransactions = transactionsByBooking.get(bookingId) || [];
 
-        // Calculate total paid from transactions
+        const totalAmount = booking.payment.totalAmount || 0;
+        const discountAmount = (booking as any).discount?.amount || 0;
+        const netTotalAmount = totalAmount - discountAmount;
         const totalPaid = bookingTransactions.reduce(
           (sum, txn) => sum + txn.amount,
           0
         );
-
-        const totalAmount = booking.payment.totalAmount || 0;
-        const pendingAmount = totalAmount - totalPaid;
+        const pendingAmount = netTotalAmount - totalPaid;
 
         // Update totals
         summary.totalReceived += totalPaid;
@@ -131,12 +132,14 @@ export class ReportService {
             clientName: booking.clientName,
             contactNo: booking.contactNo,
             email: booking.email,
-            totalAmount,
+            totalAmount: netTotalAmount,
             advanceAmount: totalPaid,
             pendingAmount,
             eventDate: booking.eventStartDateTime,
             paymentMode: booking.payment.paymentMode,
             occasionType: booking.occasionType,
+            discount: (booking as any).discount || undefined,
+            gstCalculation: (booking as any).gstCalculation || undefined,
           });
         }
       }
@@ -169,7 +172,7 @@ export class ReportService {
             vendorName: po.vendorDetails.name,
             amountDue: amountDue,
             eventDate: booking.eventStartDateTime,
-            // Removed bankDetails from cash ledger report
+            bankDetails: po.vendorDetails.bankDetails, // Restore bankDetails for the frontend
             poNumber: po.poNumber,
             poTotalAmount: po.totalAmount,
             poPaidAmount: po.paidAmount,

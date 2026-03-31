@@ -27,6 +27,8 @@ export interface IFoodPackageSnapshot {
   sections: IFoodPackageSection[]
   defaultPrice?: number
   totalPricePerPerson: number
+  totalBasePrice?: number
+  totalAddonPrice?: number
 }
 
 export interface ISelectedMenuItem {
@@ -39,6 +41,22 @@ export interface ISelectedMenuSection {
   sectionName: string;
   selectionType: "free" | "limit" | "all_included";
   selectedItems: ISelectedMenuItem[];
+}
+
+export interface IGSTCalculation {
+  enabled: boolean;
+  food: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  services: {
+    rate: 5 | 18;
+    taxableAmount: number;
+    gstAmount: number;
+  };
+  totalGST: number;
+  grandTotal: number;
 }
 
 export interface ILead extends Document {
@@ -92,6 +110,8 @@ export interface ILead extends Document {
   }>;
   selectedMenu?: ISelectedMenuSection[];
   notes?: string;
+  gstCalculation?: IGSTCalculation;
+  remarks?: Types.ObjectId[];
   createdBy?: Types.ObjectId;
   updatedBy?: Types.ObjectId;
   lastModifiedBy?: Types.ObjectId;
@@ -149,6 +169,7 @@ export interface CreateLeadDTO {
     price: number;
   }>;
   notes?: string;
+  gstCalculation?: IGSTCalculation;
   createdBy?: Types.ObjectId;
 }
 
@@ -201,6 +222,7 @@ export interface UpdateLeadDTO {
     price: number;
   }>;
   notes?: string;
+  gstCalculation?: IGSTCalculation;
   updatedBy?: Types.ObjectId;
 }
 

@@ -6,7 +6,7 @@ import { User } from "../models/User";
 
 // Updated role types for the new system
 export type RoleSnapshot = {
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions?: string[];
 };
 
@@ -72,6 +72,21 @@ export const PERMS = {
   LEAD_ASSIGN: "lead.assign",
   LEAD_UPDATE: "lead.update",
   LEAD_DELETE: "lead.delete",
+
+  // Contact management
+  CONTACT_CREATE: "contact.create",
+  CONTACT_READ: "contact.read",
+  CONTACT_UPDATE: "contact.update",
+  CONTACT_DELETE: "contact.delete",
+
+  // Admin panel management
+  ADMIN_PANEL_ACCESS: "admin.panel.access",
+  ADMIN_PANEL_USER_MANAGE: "admin.panel.user.manage",
+  ADMIN_PANEL_BUSINESS_MANAGE: "admin.panel.business.manage",
+  ADMIN_PANEL_ANALYTICS_VIEW: "admin.panel.analytics.view",
+  ADMIN_PANEL_SETTINGS_MANAGE: "admin.panel.settings.manage",
+  ADMIN_PANEL_MARKETING_VIEW: "admin.panel.marketing.view",
+  ADMIN_PANEL_MARKETING_MANAGE: "admin.panel.marketing.manage",
 } as const;
 
 // Role to permissions mapping - easily extensible
@@ -175,6 +190,11 @@ export const ROLE_TO_PERMS = {
     "lead.assign",
     "lead.update",
     "lead.delete",
+    // All contact permissions
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
   ],
 
   // MANAGER: Can access and modify all data but with some restrictions
@@ -222,6 +242,79 @@ export const ROLE_TO_PERMS = {
     "lead.assign",
     "lead.update",
     "lead.delete",
+    // Full contact management
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
+  ],
+
+  // ADMIN: Full system access like developer + admin panel access
+  admin: [
+    // All existing permissions (like developer)
+    "user.create",
+    "user.read",
+    "user.update",
+    "user.delete",
+    "business.create",
+    "business.read",
+    "business.update",
+    "business.delete",
+    "venue.create",
+    "venue.read",
+    "venue.update",
+    "venue.delete",
+    "package.create",
+    "package.read",
+    "package.update",
+    "package.delete",
+    "vendor.create",
+    "vendor.read",
+    "vendor.update",
+    "vendor.delete",
+    "booking.create",
+    "booking.read",
+    "booking.update",
+    "booking.delete",
+    "notes.create",
+    "notes.read",
+    "notes.update",
+    "notes.delete",
+    "timeslot.create",
+    "timeslot.read",
+    "timeslot.update",
+    "timeslot.delete",
+    "manager.create",
+    "manager.read",
+    "manager.assign",
+    "manager.update",
+    "manager.delete",
+    "lead.create",
+    "lead.read",
+    "lead.assign",
+    "lead.update",
+    "lead.delete",
+    "contact.create",
+    "contact.read",
+    "contact.update",
+    "contact.delete",
+    // Admin panel specific permissions
+    "admin.panel.access",
+    "admin.panel.user.manage",
+    "admin.panel.business.manage",
+    "admin.panel.analytics.view",
+    "admin.panel.settings.manage",
+    "admin.panel.marketing.view",
+    "admin.panel.marketing.manage",
+  ],
+
+  // MARKETING: Admin panel access only (limited)
+  marketing: [
+    // Admin panel access with limited permissions
+    "admin.panel.access",
+    "admin.panel.analytics.view",
+    "admin.panel.marketing.view",
+    "admin.panel.marketing.manage",
   ],
 } as const;
 
@@ -231,8 +324,8 @@ const oid = (id: string | Types.ObjectId) =>
 const hasPerm = (role?: RoleSnapshot, perm?: string): boolean => {
   if (!role) return false;
 
-  // DEVELOPER has full access
-  if (role.role === "developer") return true;
+  // DEVELOPER and ADMIN have full access
+  if (role.role === "developer" || role.role === "admin") return true;
 
   if (!perm) return false;
 
@@ -252,12 +345,15 @@ const hasPerm = (role?: RoleSnapshot, perm?: string): boolean => {
  *   1) req.params.businessId
  *   2) req.params.venueId -> look up Venue.businessId
  *   3) req.params.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   3.1) req.params.leadId -> look up Lead.venueId -> Venue.businessId
  *   4) req.query.venueId -> look up Venue.businessId (for GET requests with query params)
  *   5) req.query.businessId (for GET requests with query params)
  *   6) req.query.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   6.1) req.query.leadId -> look up Lead.venueId -> Venue.businessId
  *   7) req.body.businessId
  *   8) req.body.venueId -> look up Venue.businessId
  *   9) req.body.bookingId -> look up Booking.venueId -> Venue.businessId
+ *   9.1) req.body.leadId -> look up Lead.venueId -> Venue.businessId
  */
 export async function resolveBusinessId(
   req: Request
@@ -277,7 +373,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(p["venueId"]))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (3) bookingId param -> lookup venue -> businessId
@@ -290,7 +387,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (3.1) leadId param -> lookup venue -> businessId
+    if (p["leadId"]) {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(p["leadId"]))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 
@@ -299,7 +412,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(q["venueId"]))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (5) businessId in query (for GET requests)
@@ -317,7 +431,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (6.1) leadId in query -> lookup venue -> businessId
+    if (q["leadId"] && typeof q["leadId"] === "string") {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(q["leadId"]))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 
@@ -331,7 +461,8 @@ export async function resolveBusinessId(
       const venue = await Venue.findById(oid(b.venueId))
         .select("businessId")
         .lean();
-      return venue ? String(venue.businessId) : undefined;
+      const businessId = venue ? String(venue.businessId) : undefined;
+      return businessId;
     }
 
     // (9) bookingId in body -> lookup venue -> businessId
@@ -344,7 +475,23 @@ export async function resolveBusinessId(
         const venue = await Venue.findById(booking.venueId)
           .select("businessId")
           .lean();
-        return venue ? String(venue.businessId) : undefined;
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
+      }
+    }
+
+    // (9.1) leadId in body -> lookup venue -> businessId
+    if (b?.leadId) {
+      const Lead = (await import("../models/Lead")).Lead;
+      const lead = await Lead.findById(oid(b.leadId))
+        .select("venueId")
+        .lean();
+      if (lead) {
+        const venue = await Venue.findById(lead.venueId)
+          .select("businessId")
+          .lean();
+        const businessId = venue ? String(venue.businessId) : undefined;
+        return businessId;
       }
     }
 
@@ -365,25 +512,24 @@ export async function rolesMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> {
   try {
-    const extReq = req as any;
-
-    // If already set (e.g., by a previous middleware), skip
-    if (extReq.userRole) {
+    // Skip if userRole already resolved (e.g., by earlier middleware)
+    if (req.userRole) {
       return next();
     }
 
-    if (!extReq.user?.userId) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!req.user?.userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
     }
 
-    // Check if user is a developer - grant full access
-    if (extReq.user?.role === "developer") {
-      extReq.userRole = {
-        role: "developer",
+    // Check if user is a developer or admin - grant full access
+    if (req.user?.role === "developer" || req.user?.role === "admin") {
+      req.userRole = {
+        role: req.user.role as "developer" | "admin",
         permissions: ["*"],
-      };
+      } as RoleSnapshot;
       return next();
     }
 
@@ -394,15 +540,15 @@ export async function rolesMiddleware(
     }
 
     const roleDoc = await UserBusinessRole.findOne({
-      userId: oid(extReq.user.userId),
+      userId: oid(req.user.userId),
       businessId: oid(businessId),
     })
       .select("role permissions")
       .lean();
 
     if (roleDoc) {
-      extReq.userRole = {
-        role: roleDoc.role,
+      req.userRole = {
+        role: roleDoc.role as "developer" | "owner" | "manager",
         permissions: roleDoc.permissions ?? [],
       };
     }
@@ -410,9 +556,8 @@ export async function rolesMiddleware(
     return next();
   } catch (err: any) {
     console.error("Error in rolesMiddleware:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to resolve user role" });
+    res.status(500).json({ success: false, message: "Failed to resolve user role" });
+    return;
   }
 }
 
@@ -457,8 +602,9 @@ export function requirePerm(perm: string | string[]) {
         }
       }
 
-      // Developer bypass
-      if (extReq.userRole?.role === "developer") {
+      // Developer and Admin bypass
+      const userRole = extReq.userRole?.role || extReq.user?.role;
+      if (extReq.userRole?.role === "developer" || extReq.userRole?.role === "admin" || userRole === "admin") {
         return next();
       }
 
@@ -490,7 +636,7 @@ export const RoleHelper = {
    * Check if a role has a specific permission
    */
   hasPermission(role: string, permission: string): boolean {
-    if (role === "developer") return true;
+    if (role === "developer" || role === "admin") return true;
     const rolePerms = ROLE_TO_PERMS[
       role as keyof typeof ROLE_TO_PERMS
     ] as readonly string[];
@@ -501,7 +647,7 @@ export const RoleHelper = {
    * Get all permissions for a role
    */
   getPermissionsForRole(role: string): string[] {
-    if (role === "developer") {
+    if (role === "developer" || role === "admin") {
       return Object.values(PERMS);
     }
     return [...(ROLE_TO_PERMS[role as keyof typeof ROLE_TO_PERMS] || [])];
@@ -515,7 +661,7 @@ export const RoleHelper = {
     requiredBusinessId?: string
   ): boolean {
     if (!userRole) return false;
-    if (userRole.role === "developer") return true;
+    if (userRole.role === "developer" || userRole.role === "admin") return true;
     // For now, all business-scoped roles can access their business
     // Future: implement business-specific access control
     return true;

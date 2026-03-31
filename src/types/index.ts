@@ -1,12 +1,23 @@
 import { Document, Types } from "mongoose";
 
+export type LogoType =
+  | "primary"
+  | "secondary"
+  | "favicon"
+  | "watermark";
+
 export interface IUser extends Document<Types.ObjectId> {
   _id: Types.ObjectId;
   email: string;
   password: string;
+  mustChangePassword: boolean;
   firstName: string;
   lastName: string;
-  phone?: string | null;
+  phone?: string;
+  googleId?: string;
+  googleProfilePicture?: string;
+  isEmailVerified: boolean;
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   createdAt: Date;
   updatedAt: Date;
   createdBy?: Types.ObjectId | string;
@@ -28,7 +39,30 @@ export interface IBusiness extends Document<Types.ObjectId> {
   };
   website?: string | null;
   socials?: { name: string; url: string }[];
-  branding: { logoUrl?: string | null };
+  branding: { 
+    logos: Array<{
+      _id?: Types.ObjectId;
+      url: string;
+      publicId: string;
+      name: string;        // "Primary Logo", "Favicon", "Watermark"
+      type: LogoType;        // "primary", "secondary", "favicon"
+      isActive: boolean;
+      uploadedAt: Date;
+    }>
+  };
+  qrCode?: string | null;
+  termsAndConditions: {
+    title: string;
+    content: string;
+    lastUpdated: Date;
+    updatedBy?: string | null;
+  };
+  paymentPolicy: {
+    title: string;
+    content: string;
+    lastUpdated: Date;
+    updatedBy?: string | null;
+  };
 
   status: "inactive" | "active";
   isDeleted: boolean;
@@ -149,7 +183,7 @@ export interface IUserBusinessRole extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
   businessId: Types.ObjectId;
   venueId?: Types.ObjectId; // Optional - for venue-specific assignments
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions: string[];
   scope: "business" | "venue"; // business = all venues, venue = specific venue
   assignedBy?: Types.ObjectId; // Who assigned this role
@@ -160,9 +194,9 @@ export interface IUserBusinessRole extends Document<Types.ObjectId> {
 export interface IJWTPayload {
   userId: string;
   email: string;
+  role?: "developer" | "owner" | "manager" | "admin" | "marketing" | "user";
   iat?: number;
   exp?: number;
-  role?: "developer" | "owner" | "manager" | "user";
 }
 
 export interface OwnerBusinessFilters {
@@ -191,4 +225,4 @@ export interface OwnerBusinessResponse {
     inactiveBusinesses: number;
     totalVenues: number;
   };
-}
+} 

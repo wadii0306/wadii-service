@@ -106,6 +106,69 @@ const FoodPackageSchema = new Schema(
   { _id: false }
 )
 
+const GSTCalculationSchema = new Schema(
+  {
+    enabled: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
+    food: {
+      rate: {
+        type: Number,
+        enum: [0, 5, 18],
+        default: 5,
+        required: true,
+      },
+      taxableAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+      gstAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+    },
+    services: {
+      rate: {
+        type: Number,
+        enum: [0, 5, 18],
+        default: 18,
+        required: true,
+      },
+      taxableAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+      gstAmount: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+    },
+    totalGST: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+    grandTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
 const bookingSchema = new Schema<
   IBooking,
   mongoose.Model<IBooking, BookingQueryHelpers>,
@@ -397,6 +460,16 @@ const bookingSchema = new Schema<
         // This represents the primary/default payment mode
       },
     },
+    discount: {
+      amount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      note: {
+        type: String,
+      },
+    },
     notes: {
       type: String,
       default: "",
@@ -404,6 +477,10 @@ const bookingSchema = new Schema<
     internalNotes: {
       type: String,
       default: "",
+    },
+    gstCalculation: {
+      type: GSTCalculationSchema,
+      required: false,
     },
     // Tracking (Booking-specific)
     createdBy: {

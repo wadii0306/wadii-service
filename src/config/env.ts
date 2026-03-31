@@ -9,6 +9,15 @@ interface IEnvironmentConfig {
   JWT_SECRET: string;
   JWT_EXPIRE: string;
   BCRYPT_ROUNDS: number;
+  FRONTEND_URL: string;
+  cloudinary: {
+    cloudName: string;
+    apiKey: string;
+    apiSecret: string;
+  };
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_CALLBACK_URL?: string;
 }
 
 class EnvironmentConfig {
@@ -24,6 +33,15 @@ class EnvironmentConfig {
       JWT_SECRET: process.env.JWT_SECRET || "your-super-secret-jwt-key",
       JWT_EXPIRE: process.env.JWT_EXPIRE || "7d",
       BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || "12", 10),
+      FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
+      cloudinary: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+        apiKey: process.env.CLOUDINARY_API_KEY || "",
+        apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+      },
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+      GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || "",
     };
   }
 

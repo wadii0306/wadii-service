@@ -10,6 +10,11 @@ import purchaseOrderRoutes from "./purchaseOrderRoutes";
 import reportRoutes from "./reportRoutes";
 import blackoutDayRoutes from "./blackoutDayRoutes";
 import foodMenuRoutes from "./foodMenuRoutes";
+import leadRemarkRoutes from "./leadRemarkRoutes";
+import contactRoutes from "./website/contactRouts";
+import publicRoutes from "./publicRoutes";
+import inquiryRoutes from "./inquiryRoutes";
+import adminRoutes from "./adminRoutes";
 
 const router = Router();
 
@@ -23,7 +28,11 @@ router.get("/health", (req, res) => {
   });
 });
 
+// Public routes (no authentication required)
+router.use("/public", publicRoutes);
+
 router.use("/auth", authRoutes);
+router.use("/admin", adminRoutes); // Admin-specific routes
 router.use("/businesses", businessRoutes);
 router.use("/venues", venueRoutes);
 router.use("/venues", foodMenuRoutes); // Food menu routes under /venues/:venueId/food-menu
@@ -34,5 +43,8 @@ router.use("/transactions", transactionRoutes);
 router.use("/purchase-orders", purchaseOrderRoutes);
 router.use("/reports", reportRoutes);
 router.use("/blackout-days", blackoutDayRoutes);
+router.use("/lead-remarks", leadRemarkRoutes);
+router.use("/website", contactRoutes);
+router.use("/inquiries", inquiryRoutes);
 
 export default router;

@@ -341,10 +341,11 @@ export class TransactionService {
         throw new Error("Booking not found");
       }
 
-      // Calculate total paid from successful transactions
+      // Calculate total paid from successful inbound transactions
       const transactions = await Transaction.find({
         bookingId: oid(bookingId),
         status: "success",
+        direction: "inbound", // ONLY client payments should count towards booking totalPaid
       });
 
       const totalPaid = transactions.reduce((sum, txn) => sum + txn.amount, 0);

@@ -197,8 +197,24 @@ export class FoodMenuService {
       throw new Error("Section not found");
     }
 
-    // Remove section
+    // Get the section name before removing it
+    const sectionName = venue.foodMenu[sectionIndex].sectionName;
+
+    // Remove section from foodMenu
     venue.foodMenu.splice(sectionIndex, 1);
+
+    // Remove references to this section from all food packages
+    if (venue.foodPackages && venue.foodPackages.length > 0) {
+      venue.foodPackages.forEach(pkg => {
+        if (pkg.menuSections && pkg.menuSections.length > 0) {
+          pkg.menuSections = pkg.menuSections.filter(
+            (ms: any) => ms.sectionName !== sectionName
+          );
+        }
+      });
+      venue.markModified("foodPackages");
+    }
+
     venue.updatedBy = updatedBy;
     venue.markModified("foodMenu");
     await venue.save();

@@ -23,7 +23,7 @@ const serviceSchema = z.object({
   vendor: z
     .object({
       name: z.string().optional(),
-      email: z.string().email().optional(),
+      email: z.string().optional(),
       phone: z.string().min(10).optional(),
       bankDetails: bankDetailsSchema.optional(),
     })
@@ -58,6 +58,20 @@ const foodPackageSchema = z.object({
   defaultPrice: z.number().min(0).optional(),
 })
 
+const gstCalculationSchema = z.object({
+  enabled: z.boolean().default(false),
+  food: z.object({
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Food GST rate must be 0 (disabled), 5, or 18"
+    }).default(5),
+  }).optional(),
+  services: z.object({
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Services GST rate must be 0 (disabled), 5, or 18"
+    }).default(18),
+  }).optional(),
+}).optional();
+
 
 
 
@@ -70,7 +84,7 @@ export const createBookingSchema = z
     leadId: z.string().optional().nullable(),
     clientName: z.string().trim().min(1, "Client name is required"),
     contactNo: z.string().trim().min(1, "Contact number is required"),
-    email: z.string().trim().toLowerCase().email("Invalid email format"),
+    email: z.string().trim().toLowerCase().optional(),
     occasionType: z.string().trim().min(1, "Occasion type is required"),
     numberOfGuests: z
       .number()
@@ -87,7 +101,7 @@ export const createBookingSchema = z
     cateringServiceVendor: z
       .object({
         name: z.string(),
-        email: z.string().email(),
+        email: z.string().optional(),
         phone: z.string(),
         bankDetails: bankDetailsSchema.optional(),
       })
@@ -109,8 +123,15 @@ export const createBookingSchema = z
         .enum(["cash", "card", "upi", "bank_transfer", "cheque", "other"])
         .default("cash"),
     }),
+    discount: z
+      .object({
+        amount: z.number().min(0, "Discount amount must be positive"),
+        note: z.string().optional(),
+      })
+      .optional(),
     notes: z.string().optional(),
     internalNotes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
   })
   .refine(
     (data) => {
@@ -141,7 +162,7 @@ export const updateBookingSchema = z
   .object({
     clientName: z.string().trim().min(1).optional(),
     contactNo: z.string().trim().min(1).optional(),
-    email: z.string().trim().toLowerCase().email().optional(),
+    email: z.string().trim().toLowerCase().optional(),
     occasionType: z.string().trim().min(1).optional(),
     numberOfGuests: z.number().int().min(1).optional(),
     bookingStatus: z
@@ -154,7 +175,7 @@ export const updateBookingSchema = z
     cateringServiceVendor: z
       .object({
         name: z.string(),
-        email: z.string().email(),
+        email: z.string().optional(),
         phone: z.string(),
         bankDetails: bankDetailsSchema.optional(),
       })
@@ -168,8 +189,15 @@ export const updateBookingSchema = z
           .optional(),
       })
       .optional(),
+    discount: z
+      .object({
+        amount: z.number().min(0, "Discount amount must be positive").optional(),
+        note: z.string().optional(),
+      })
+      .optional(),
     notes: z.string().optional(),
     internalNotes: z.string().optional(),
+    gstCalculation: gstCalculationSchema.optional(),
   })
   .partial()
   .refine(

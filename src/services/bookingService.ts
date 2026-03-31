@@ -6,6 +6,7 @@ import BlackoutDayService from "./blackoutDayService";
 import {
   calculateFoodCost,
   calculateTotals,
+  calculateTotalsWithGST,
   recalcFoodPackage,
 } from "../utils/helper";
 
@@ -62,10 +63,13 @@ export class BookingService {
           }
         }
 
-        bookingData.foodPackage = recalcFoodPackage(
-          bookingData.foodPackage,
-          venuePackageConfig
-        );
+        // Only recalculate if totalPricePerPerson is not already set (preserve user edits)
+        if (!bookingData.foodPackage.totalPricePerPerson) {
+          bookingData.foodPackage = recalcFoodPackage(
+            bookingData.foodPackage,
+            venuePackageConfig
+          );
+        }
 
         const totals = calculateTotals({
           foodPackage: bookingData.foodPackage,
@@ -73,16 +77,74 @@ export class BookingService {
           services: bookingData.services,
         });
 
-        bookingData.foodCostTotal = totals.foodCostTotal;
+        // ✅ REMOVED: foodCostTotal is now redundant
+        // bookingData.foodCostTotal = totals.foodCostTotal;
+
+        // Handle GST calculation
+        if (bookingData.gstCalculation?.enabled) {
+          // Case 1: Manual booking with GST enabled
+          const totalsWithGST = calculateTotalsWithGST({
+            foodPackage: bookingData.foodPackage,
+            numberOfGuests: bookingData.numberOfGuests,
+            services: bookingData.services,
+            foodGSTRate: bookingData.gstCalculation.food?.rate || 5,
+            servicesGSTRate: bookingData.gstCalculation.services?.rate || 18,
+          });
+
+          bookingData.gstCalculation = {
+            enabled: true,
+            food: totalsWithGST.gst.food,
+            services: totalsWithGST.gst.services,
+            totalGST: totalsWithGST.gst.totalGST,
+            grandTotal: totalsWithGST.gst.grandTotal,
+          };
+        } else if (bookingData.leadId) {
+          // Case 2: Booking from lead - check if lead has GST
+          const { Lead } = await import("../models/Lead");
+          const lead = await Lead.findById(bookingData.leadId).lean();
+          
+          if (lead?.gstCalculation?.enabled) {
+            // Copy GST settings from lead and recalculate if needed
+            const totalsWithGST = calculateTotalsWithGST({
+              foodPackage: bookingData.foodPackage,
+              numberOfGuests: bookingData.numberOfGuests,
+              services: bookingData.services,
+              foodGSTRate: lead.gstCalculation.food.rate,
+              servicesGSTRate: lead.gstCalculation.services.rate,
+            });
+
+            bookingData.gstCalculation = {
+              enabled: true,
+              food: totalsWithGST.gst.food,
+              services: totalsWithGST.gst.services,
+              totalGST: totalsWithGST.gst.totalGST,
+              grandTotal: totalsWithGST.gst.grandTotal,
+            };
+          }
+        }
 
         const advanceAmount = bookingData.payment?.advanceAmount ?? 0;
+        const discountAmount = bookingData.discount?.amount ?? 0;
 
+        // Calculate final amount with GST if enabled
+        let finalAmount = totals.totalAmount;
+        if (bookingData.gstCalculation?.enabled) {
+          finalAmount = bookingData.gstCalculation.grandTotal;
+        }
+
+        // Store final amount (INCLUDES GST when enabled)
         bookingData.payment = {
           ...bookingData.payment,
-          totalAmount: Number(totals.totalAmount),
+          totalAmount: Number(finalAmount), // ✅ FIXED: Now includes GST
           advanceAmount: advanceAmount,
           paymentStatus: bookingData.payment?.paymentStatus ?? "unpaid",
           paymentMode: bookingData.payment?.paymentMode ?? "cash",
+        };
+
+        // Store discount separately (DO NOT modify totalAmount)
+        bookingData.discount = {
+          amount: discountAmount,
+          note: bookingData.discount?.note,
         };
       }
 
@@ -272,38 +334,88 @@ export class BookingService {
             }
           }
 
-          updateData.foodPackage = recalcFoodPackage(
-            updateData.foodPackage,
-            venuePackageConfig
-          );
+          // Only recalculate if totalPricePerPerson is not already set (preserve user edits)
+          if (!updateData.foodPackage.totalPricePerPerson) {
+            updateData.foodPackage = recalcFoodPackage(
+              updateData.foodPackage,
+              venuePackageConfig
+            );
+          }
         }
 
-        // Recalculate food cost total if either foodPackage or numberOfGuests changed
-        if (foodPackageToCalc && guestsToCalc) {
-          const finalFoodPackage = updateData.foodPackage || currentBooking.foodPackage;
-          updateData.foodCostTotal = calculateFoodCost(
-            finalFoodPackage,
-            guestsToCalc
-          );
-        }
+        // ✅ REMOVED: foodCostTotal is now redundant
+        // updateData.foodCostTotal = calculateFoodCost(
+        //   finalFoodPackage,
+        //   guestsToCalc
+        // );
 
         // Always recalculate payment total amount when foodPackage, numberOfGuests, or services change
-        const finalFoodCostTotal = updateData.foodCostTotal ?? (currentBooking as any).foodCostTotal ?? 0;
+        const finalFoodPackage = updateData.foodPackage || currentBooking.foodPackage;
+        const finalGuests = updateData.numberOfGuests ?? currentBooking.numberOfGuests;
         const finalServices = updateData.services ?? currentBooking.services ?? [];
         const servicesTotal = finalServices.reduce(
           (sum: number, s: any) => sum + (s.price || 0),
           0
         );
 
-        // Preserve existing payment details but update totalAmount
+        // ✅ FIXED: Use proper source of truth for food cost
+        let foodCostTotal = 0;
+        if (updateData.gstCalculation?.enabled || (currentBooking as any).gstCalculation?.enabled) {
+          // When GST enabled → use gstCalculation.food.taxableAmount
+          foodCostTotal = updateData.gstCalculation?.food?.taxableAmount || 
+                          (currentBooking as any).gstCalculation?.food?.taxableAmount || 0;
+        } else {
+          // When GST disabled → use foodPackage.totalPricePerPerson * numberOfGuests
+          foodCostTotal = (finalFoodPackage?.totalPricePerPerson || 0) * finalGuests;
+        }
+
+        // Handle GST recalculation for updates
+        if (updateData.gstCalculation?.enabled || (updateData.foodPackage || updateData.services || updateData.numberOfGuests)) {
+          const finalFoodPackage = updateData.foodPackage || currentBooking.foodPackage;
+          const finalGuests = updateData.numberOfGuests ?? currentBooking.numberOfGuests;
+          const finalServicesForGST = updateData.services ?? currentBooking.services ?? [];
+          
+          if (finalFoodPackage && (updateData.gstCalculation?.enabled || (currentBooking as any).gstCalculation?.enabled)) {
+            const totalsWithGST = calculateTotalsWithGST({
+              foodPackage: finalFoodPackage,
+              numberOfGuests: finalGuests,
+              services: finalServicesForGST,
+              foodGSTRate: updateData.gstCalculation?.food?.rate || (currentBooking as any).gstCalculation?.food?.rate || 5,
+              servicesGSTRate: updateData.gstCalculation?.services?.rate || (currentBooking as any).gstCalculation?.services?.rate || 18,
+            });
+
+            updateData.gstCalculation = {
+              enabled: true,
+              food: totalsWithGST.gst.food,
+              services: totalsWithGST.gst.services,
+              totalGST: totalsWithGST.gst.totalGST,
+              grandTotal: totalsWithGST.gst.grandTotal,
+            };
+          }
+        }
+
+        // Calculate final amount with GST if enabled
+        let finalAmount = foodCostTotal + servicesTotal;
+        if (updateData.gstCalculation?.enabled || (currentBooking as any).gstCalculation?.enabled) {
+          finalAmount = updateData.gstCalculation?.grandTotal || (currentBooking as any).gstCalculation?.grandTotal || finalAmount;
+        }
+
+        // Store final amount (INCLUDES GST when enabled)
         const currentPayment = currentBooking.payment || {};
         const updatePayment: any = updateData.payment || {}
 
         updateData.payment = {
-          totalAmount: finalFoodCostTotal + servicesTotal,
+          totalAmount: finalAmount, // ✅ FIXED: Now includes GST
           advanceAmount: updatePayment.advanceAmount ?? currentPayment.advanceAmount ?? 0,
           paymentStatus: updatePayment.paymentStatus ?? currentPayment.paymentStatus ?? "unpaid",
           paymentMode: updatePayment.paymentMode ?? currentPayment.paymentMode ?? "cash",
+        };
+
+        // Store discount separately (DO NOT modify totalAmount)
+        const discountAmount = updateData.discount?.amount ?? (currentBooking as any).discount?.amount ?? 0;
+        updateData.discount = {
+          amount: discountAmount,
+          note: updateData.discount?.note ?? (currentBooking as any).discount?.note,
         };
       }
 

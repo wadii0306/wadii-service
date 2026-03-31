@@ -1,10 +1,15 @@
+import dns from "dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 import express, { Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import session from "express-session";
+import passport from "passport";
 import Database from "./config/db";
 import EnvironmentConfig from "./config/env";
 import routes from "./routes";
+import googleRoutes from "./routes/googleRoutes";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 
 class App {
@@ -31,6 +36,21 @@ class App {
    * Initialize middlewares
    */
   private initializeMiddlewares(): void {
+    // Session configuration for Passport
+    this.app.use(session({
+      secret: EnvironmentConfig.getInstance().config.JWT_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: false, // Set to true in production with HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      }
+    }));
+
+    // Initialize Passport
+    this.app.use(passport.initialize());
+    this.app.use(passport.session());
+
     // CORS configuration (MUST be before helmet)
     this.app.use(
       cors({
@@ -70,7 +90,7 @@ class App {
     if (this.envConfig.NODE_ENV === "development") {
       this.app.use((req, res, next) => {
         console.log(
-          "🌐 ${req.method} ${req.path} - ${new Date().toISOString()}"
+          `🌐 ${req.method} ${req.path} - ${new Date().toISOString()}`
         );
         next();
       });
@@ -83,6 +103,9 @@ class App {
   private initializeRoutes(): void {
     // API routes
     this.app.use("/api", routes);
+    
+    // Google OAuth routes
+    this.app.use("/", googleRoutes);
 
     // Root endpoint
     this.app.get("/", (req, res) => {
@@ -117,10 +140,10 @@ class App {
     this.app.listen(port, () => {
       console.log("\n🚀 =======================================");
       console.log("🎯 Banquet Booking API Server Running!");
-      console.log("📍 Environment: ${this.envConfig.NODE_ENV}");
-      console.log("🌐 Port: ${port}");
-      console.log("📖 API Documentation: http://localhost:${port}/api/docs");
-      console.log("💚 Health Check: http://localhost:${port}/api/health");
+      console.log(`📍 Environment: ${this.envConfig.NODE_ENV}`);
+      console.log(`🌐 Port: ${port}`);
+      console.log(`📖 API Documentation: http://localhost:${port}/api/docs`);
+      console.log(`💚 Health Check: http://localhost:${port}/api/health`);
       console.log("🚀 =======================================\n");
     });
 

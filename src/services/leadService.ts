@@ -1,6 +1,6 @@
 import { Lead } from "../models/Lead";
 import { ILead } from "../types/lead-types";
-import { oid, recalcFoodPackage } from "../utils/helper";
+import { oid, recalcFoodPackage, calculateTotalsWithGST } from "../utils/helper";
 import BlackoutDayService from "./blackoutDayService";
 
 export class LeadService {
@@ -37,6 +37,72 @@ export class LeadService {
         }
       }
 
+      // NEW: Always create foodPackage for consistency
+      if (!leadData.foodPackage) {
+        // Create foodPackage from simple package or empty structure
+        if (leadData.package) {
+          // User selected simple package - convert to foodPackage structure
+          let venuePackageConfig = null;
+          if (leadData.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(leadData.venueId).lean();
+            if (venue?.foodPackages) {
+              venuePackageConfig = venue.foodPackages.find(
+                (pkg: any) =>
+                  pkg._id?.toString() ===
+                  leadData.package._id?.toString()
+              );
+            }
+          }
+          
+          if (venuePackageConfig) {
+            leadData.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: venuePackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: venuePackageConfig.price || 0,
+              totalPricePerPerson: venuePackageConfig.price || 0,
+              inclusions: venuePackageConfig.inclusions || []
+            };
+          }
+        } else {
+          // No package selected - use venue's default package or create empty
+          let defaultPackageConfig = null;
+          if (leadData.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(leadData.venueId).lean();
+            if (venue?.foodPackages && venue.foodPackages.length > 0) {
+              // Use the first package as default
+              defaultPackageConfig = venue.foodPackages[0];
+            }
+          }
+          
+          if (defaultPackageConfig) {
+            leadData.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: defaultPackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: defaultPackageConfig.price || 0,
+              totalPricePerPerson: defaultPackageConfig.price || 0,
+              inclusions: defaultPackageConfig.inclusions || []
+            };
+          } else {
+            // No packages available - create empty foodPackage
+            leadData.foodPackage = {
+              sourcePackageId: undefined,
+              name: "No Package",
+              isCustomised: false,
+              sections: [],
+              defaultPrice: 0,
+              totalPricePerPerson: 0,
+              inclusions: []
+            };
+          }
+        }
+      }
+
       // if (leadData.foodPackage) {
       //   // Fetch venue package configuration if sourcePackageId is provided
       //   let venuePackageConfig = null;
@@ -52,19 +118,69 @@ export class LeadService {
       //     }
       //   }
 
-      //   leadData.foodPackage = recalcFoodPackage(
-      //     leadData.foodPackage,
-      //     venuePackageConfig
-      //   );
+      //   // Only recalculate if totalPricePerPerson is not already set (preserve user edits)
+      //   if (!leadData.foodPackage.totalPricePerPerson) {
+      //     leadData.foodPackage = recalcFoodPackage(
+      //       leadData.foodPackage,
+      //       venuePackageConfig
+      //     );
+      //   }
       // }
 
-      const lead = new Lead(leadData)
+      // Extract remarks from lead data before creating Lead
+      const { remarks, ...pureLeadData } = leadData as any;
+      const remarksData = remarks;
+
+      // Calculate GST if foodPackage and services are present and GST is enabled
+      if (pureLeadData.foodPackage && pureLeadData.gstCalculation?.enabled) {
+        const totalsWithGST = calculateTotalsWithGST({
+          foodPackage: pureLeadData.foodPackage,
+          numberOfGuests: pureLeadData.numberOfGuests || 0,
+          services: pureLeadData.services || [],
+          foodGSTRate: pureLeadData.gstCalculation.food?.rate || 5,
+          servicesGSTRate: pureLeadData.gstCalculation.services?.rate || 18,
+        });
+
+        // Update GST calculation with actual calculated values
+        pureLeadData.gstCalculation = {
+          enabled: true,
+          food: totalsWithGST.gst.food,
+          services: totalsWithGST.gst.services,
+          totalGST: totalsWithGST.gst.totalGST,
+          grandTotal: totalsWithGST.gst.grandTotal,
+        };
+      }
+
+      const lead = new Lead(pureLeadData)
       await lead.save()
+
+      // Create lead remarks if provided
+      let createdRemarks = [];
+      if (remarksData && Array.isArray(remarksData) && remarksData.length > 0) {
+        const { LeadActivity } = await import("../models/LeadRemark");
+        
+        const remarksToCreate = remarksData.map((remark: any) => ({
+          leadId: lead._id,
+          header: remark.header,
+          description: remark.description,
+          status: remark.status || 'pending',
+          outcome: remark.outcome,
+          followUpDate: remark.followUpDate ? new Date(remark.followUpDate) : undefined,
+          createdBy: pureLeadData.createdBy
+        }));
+
+        createdRemarks = await LeadActivity.insertMany(remarksToCreate);
+        
+        // Update lead with remark references
+        lead.remarks = createdRemarks.map(remark => remark._id);
+        await lead.save();
+      }
 
       await lead.populate([
         { path: 'venueId', select: ' venueType address' },
         { path: 'createdBy', select: '_id email firstName lastName' },
         { path: 'updatedBy', select: '_id email firstName lastName' },
+        { path: 'remarks', populate: { path: 'createdBy', select: '_id email firstName lastName' } }
       ])
 
       return lead
@@ -81,7 +197,8 @@ export class LeadService {
       const lead = await Lead.findById(oid(leadId))
         .populate("venueId", "venueName venueType address")
         .populate("createdBy", "_id email firstName lastName")
-        .populate("updatedBy", "_id email firstName lastName");
+        .populate("updatedBy", "_id email firstName lastName")
+        .populate("remarks", "header description status outcome followUpDate createdAt");
       return lead;
     } catch (error: any) {
       throw new Error(`Error fetching lead: ${error.message}`);
@@ -127,6 +244,45 @@ export class LeadService {
         .populate("venueId", "venueName venueType")
         .populate("createdBy", "_id email firstName lastName")
         .populate("updatedBy", "_id email firstName lastName");
+
+      // Ensure all leads have foodPackage structure
+      for (const lead of leads) {
+        if (!lead.foodPackage) {
+          // Try to get venue's default package
+          let defaultPackageConfig = null;
+          if (lead.venueId) {
+            const { Venue } = await import("../models/Venue");
+            const venue = await Venue.findById(lead.venueId).lean();
+            if (venue?.foodPackages && venue.foodPackages.length > 0) {
+              // Use the first package as default
+              defaultPackageConfig = venue.foodPackages[0];
+            }
+          }
+          
+          if (defaultPackageConfig) {
+            lead.foodPackage = {
+              sourcePackageId: undefined, // Subdocuments don't have _id
+              name: defaultPackageConfig.name,
+              isCustomised: false,
+              sections: [],
+              defaultPrice: defaultPackageConfig.price || 0,
+              totalPricePerPerson: defaultPackageConfig.price || 0,
+              inclusions: defaultPackageConfig.inclusions || []
+            };
+          } else {
+            // No packages available - create empty foodPackage
+            lead.foodPackage = {
+              sourcePackageId: undefined,
+              name: "No Package",
+              isCustomised: false,
+              sections: [],
+              defaultPrice: 0,
+              totalPricePerPerson: 0,
+              inclusions: []
+            };
+          }
+        }
+      }
 
       console.log(
         `Fetched ${leads.length} leads for venue ${venueId} with filters:`,
@@ -198,11 +354,45 @@ export class LeadService {
     updateData: Partial<ILead>
   ): Promise<ILead | null> {
     try {
+      // Fetch current lead once at the beginning for potential GST calculation
+      let currentLead: any = null;
+      
       if (updateData.foodPackage) {
-        // Fetch venue package configuration if sourcePackageId is provided
-        let venuePackageConfig = null;
-        if (updateData.foodPackage.sourcePackageId) {
-          const currentLead = await Lead.findById(leadId).lean();
+        // Fetch current lead to get existing foodPackage data
+        currentLead = await Lead.findById(leadId).lean();
+        
+        // Only recalculate if totalPricePerPerson is not already set (preserve user edits)
+        if (!updateData.foodPackage.totalPricePerPerson) {
+          // Fetch venue package configuration if sourcePackageId is provided
+          let venuePackageConfig = null;
+          if (updateData.foodPackage.sourcePackageId) {
+            if (currentLead?.venueId) {
+              const { Venue } = await import("../models/Venue");
+              const venue = await Venue.findById(currentLead.venueId).lean();
+              if (venue?.foodPackages) {
+                venuePackageConfig = venue.foodPackages.find(
+                  (pkg: any) =>
+                    pkg._id?.toString() ===
+                    updateData?.foodPackage?.sourcePackageId?.toString()
+                );
+              }
+            }
+          }
+
+          updateData.foodPackage = recalcFoodPackage(
+            updateData.foodPackage,
+            venuePackageConfig
+          );
+        }
+
+        // FIX 1: Preserve defaultPrice from existing package or venue config
+        if (currentLead?.foodPackage?.defaultPrice && !updateData.foodPackage?.defaultPrice) {
+          if (updateData.foodPackage) {
+            updateData.foodPackage.defaultPrice = currentLead.foodPackage.defaultPrice;
+          }
+        } else if (!updateData.foodPackage?.defaultPrice && updateData.foodPackage?.sourcePackageId) {
+          // Fetch from venue config if no existing defaultPrice
+          let venuePackageConfig = null;
           if (currentLead?.venueId) {
             const { Venue } = await import("../models/Venue");
             const venue = await Venue.findById(currentLead.venueId).lean();
@@ -211,16 +401,57 @@ export class LeadService {
                 (pkg: any) =>
                   pkg._id?.toString() ===
                   updateData?.foodPackage?.sourcePackageId?.toString()
-              )
+              );
             }
+          }
+          if (updateData.foodPackage) {
+            updateData.foodPackage.defaultPrice = venuePackageConfig?.price || updateData.foodPackage.defaultPrice;
           }
         }
 
-        updateData.foodPackage = recalcFoodPackage(
-          updateData.foodPackage,
-          venuePackageConfig
-        );
+        // FIX 2: Force isCustomised to true when foodPackage is modified
+        if (updateData.foodPackage) {
+          updateData.foodPackage.isCustomised = true;
+        }
+
+        // FIX 3: Ensure immutable snapshot structure
+        if (updateData.foodPackage?.totalPricePerPerson && updateData.foodPackage?.defaultPrice) {
+          updateData.foodPackage.totalBasePrice = updateData.foodPackage.defaultPrice;
+          updateData.foodPackage.totalAddonPrice = updateData.foodPackage.totalPricePerPerson - updateData.foodPackage.defaultPrice;
+        }
       }
+
+      // Calculate GST if GST is enabled in updateData or if foodPackage/services/numberOfGuests are updated
+      if (updateData.gstCalculation?.enabled || (updateData.foodPackage || updateData.services || updateData.numberOfGuests)) {
+        // Get current lead data if we need it for GST calculation (use existing currentLead if available)
+        if (!currentLead) {
+          currentLead = await Lead.findById(leadId).lean();
+        }
+        
+        const foodPackage = updateData.foodPackage || currentLead?.foodPackage;
+        const services = updateData.services || currentLead?.services || [];
+        const numberOfGuests = updateData.numberOfGuests || currentLead?.numberOfGuests || 0;
+        
+        if (foodPackage && (updateData.gstCalculation?.enabled || currentLead?.gstCalculation?.enabled)) {
+          const totalsWithGST = calculateTotalsWithGST({
+            foodPackage,
+            numberOfGuests,
+            services,
+            foodGSTRate: updateData.gstCalculation?.food?.rate || currentLead?.gstCalculation?.food?.rate || 5,
+            servicesGSTRate: updateData.gstCalculation?.services?.rate || currentLead?.gstCalculation?.services?.rate || 18,
+          });
+
+          // Update GST calculation with actual calculated values
+          updateData.gstCalculation = {
+            enabled: true,
+            food: totalsWithGST.gst.food,
+            services: totalsWithGST.gst.services,
+            totalGST: totalsWithGST.gst.totalGST,
+            grandTotal: totalsWithGST.gst.grandTotal,
+          };
+        }
+      }
+
       const lead = await Lead.findByIdAndUpdate(
         leadId,
         { ...updateData, updatedAt: new Date() },

@@ -34,9 +34,21 @@ const foodPackageSchema = z.object({
   inclusions: z.array(z.string()).optional().default([]),
   sections: z
     .array(foodSectionSchema)
-    .min(1, 'At least one section is required'),
+    .optional()
+    .default([]), // Allow empty sections for default package pricing
   totalPricePerPerson: z.number().min(0).default(0),
   defaultPrice: z.number().min(0).optional(),
+}).refine((data) => {
+  // Either sections must exist OR defaultPrice must be provided for package-only pricing
+  if (data.sections && data.sections.length > 0) {
+    return true; // Valid if sections are provided
+  }
+  if (data.defaultPrice !== undefined && data.defaultPrice >= 0) {
+    return true; // Valid if defaultPrice is provided (package-only pricing)
+  }
+  return false; // Invalid if neither sections nor defaultPrice is provided
+}, {
+  message: "Either sections with items OR defaultPrice must be provided for food package pricing"
 })
 
 /**
@@ -56,6 +68,34 @@ const serviceSchema = z.object({
 });
 
 /**
+ * Remark schema
+ */
+const remarkSchema = z.object({
+  header: z.string().min(1, "Header is required"),
+  description: z.string().min(1, "Description is required"),
+  status: z.enum(["pending", "completed", "cancelled"]).default("pending"),
+  outcome: z.enum(["interested", "not_interested", "follow_up_needed", "converted", "lost"]).optional(),
+  followUpDate: z.string().datetime().optional(),
+});
+
+/**
+ * GST calculation schema
+ */
+const gstCalculationSchema = z.object({
+  enabled: z.boolean().default(false),
+  food: z.object({
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Food GST rate must be 0 (disabled), 5, or 18"
+    }).default(5),
+  }).optional(),
+  services: z.object({
+    rate: z.number().refine((val) => val === 0 || val === 5 || val === 18, {
+      message: "Services GST rate must be 0 (disabled), 5, or 18"
+    }).default(18),
+  }).optional(),
+}).optional();
+
+/**
  * Create lead validation schema
  */
 export const createLeadSchema = z
@@ -63,7 +103,7 @@ export const createLeadSchema = z
     venueId: objectId,
     clientName: z.string().min(1, "Client name is required"),
     contactNo: z.string().min(1, "Contact number is required"),
-    email: z.string().email("Invalid email format"),
+    email: z.string().email("Invalid email format").optional(),
     occasionType: z.string().min(1, "Occasion type is required"),
     numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
     leadStatus: z.enum(["cold", "warm", "hot"]).default("cold"),
@@ -74,7 +114,9 @@ export const createLeadSchema = z
       .default("event"),
     foodPackage: foodPackageSchema.optional(),
     services: z.array(serviceSchema).optional(),
+    remarks: z.array(remarkSchema).optional(),
     notes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
     cateringServiceVendor: z
       .object({
         name: z.string(),
@@ -118,6 +160,7 @@ export const updateLeadSchema = z
       })
       .optional(),
     notes: z.string().optional(),
+    gstCalculation: gstCalculationSchema,
   })
   .optional();
 
