@@ -67,7 +67,7 @@ export class VenueContextService {
       // Update user with default venue
       await User.findByIdAndUpdate(userId, {
         activeVenueId: new mongoose.Types.ObjectId(activeVenueId),
-        activeBusinessId: new mongoose.Types.ObjectId(activeBusinessId),
+        activeBusinessId: new mongoose.Types.ObjectId(activeBusinessId!),
       });
     }
 

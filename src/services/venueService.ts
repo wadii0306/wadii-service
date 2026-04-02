@@ -133,7 +133,7 @@ export interface ICreateVendorForService {
 }
 
 export type RoleSnapshot = {
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions?: string[];
 };
 

@@ -8,7 +8,7 @@ import { uploadImage } from "../utils/cloudinary";
 import fs from "fs";
 
 export type RoleSnapshot = {
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions?: string[];
 };
 

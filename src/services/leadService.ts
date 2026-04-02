@@ -43,14 +43,13 @@ export class LeadService {
         if (leadData.package) {
           // User selected simple package - convert to foodPackage structure
           let venuePackageConfig = null;
-          if (leadData.venueId) {
+          if (leadData.venueId && leadData.package) {
             const { Venue } = await import("../models/Venue");
             const venue = await Venue.findById(leadData.venueId).lean();
-            if (venue?.foodPackages) {
+            if (venue?.foodPackages && leadData.package) {
               venuePackageConfig = venue.foodPackages.find(
                 (pkg: any) =>
-                  pkg._id?.toString() ===
-                  leadData.package._id?.toString()
+                  pkg.name === leadData.package!.name
               );
             }
           }

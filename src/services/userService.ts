@@ -228,7 +228,7 @@ export class AuthService {
     const user = await User.findOne({ email }).select("+password");
     if (!user) throw new Error("Invalid credentials");
 
-    const ok = await PasswordUtils.comparePassword(password, user.password);
+    const ok = await PasswordUtils.comparePassword(password, user.password || "");
     if (!ok) throw new Error("Invalid credentials");
 
     const token = JWTUtils.generateToken({

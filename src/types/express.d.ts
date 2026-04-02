@@ -9,7 +9,7 @@ declare module "express-serve-static-core" {
       exp?: number;
     };
     userRole: {
-      role: "developer" | "owner" | "manager";
+      role: "developer" | "owner" | "manager" | "admin" | "marketing";
       permissions?: string[] | undefined;
     };
   }

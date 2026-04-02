@@ -5,7 +5,7 @@ import { UserBusinessRole } from "../models/UserBusinessRole";
 import { IFoodMenuSection, IFoodMenuItem } from "../types";
 
 export type RoleSnapshot = {
-  role: "developer" | "owner" | "manager";
+  role: "developer" | "owner" | "manager" | "admin" | "marketing";
   permissions?: string[];
 };
 
