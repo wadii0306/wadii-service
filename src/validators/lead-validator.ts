@@ -103,7 +103,7 @@ export const createLeadSchema = z
     venueId: objectId,
     clientName: z.string().min(1, "Client name is required"),
     contactNo: z.string().min(1, "Contact number is required"),
-    email: z.string().email("Invalid email format").optional(),
+    email: z.string().email("Invalid email format").or(z.literal("")).optional(),
     occasionType: z.string().min(1, "Occasion type is required"),
     numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
     leadStatus: z.enum(["cold", "warm", "hot"]).default("cold"),
@@ -142,7 +142,7 @@ export const updateLeadSchema = z
   .object({
     clientName: z.string().min(1).optional(),
     contactNo: z.string().min(1).optional(),
-    email: z.string().email().optional(),
+    email: z.string().email().or(z.literal("")).optional(),
     occasionType: z.string().min(1).optional(),
     numberOfGuests: z.number().min(1).optional(),
     leadStatus: z.enum(["cold", "warm", "hot"]).optional(),

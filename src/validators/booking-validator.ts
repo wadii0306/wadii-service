@@ -53,9 +53,21 @@ const foodPackageSchema = z.object({
   inclusions: z.array(z.string()).optional().default([]),
   sections: z
     .array(foodSectionSchema)
-    .min(1, 'At least one section is required'),
+    .optional()
+    .default([]), // Allow empty sections for default package pricing
   totalPricePerPerson: z.number().min(0).default(0),
   defaultPrice: z.number().min(0).optional(),
+}).refine((data) => {
+  // Either sections must exist OR defaultPrice must be provided for package-only pricing
+  if (data.sections && data.sections.length > 0) {
+    return true; // Valid if sections are provided
+  }
+  if (data.defaultPrice !== undefined && data.defaultPrice >= 0) {
+    return true; // Valid if defaultPrice is provided (package-only pricing)
+  }
+  return false; // Invalid if neither sections nor defaultPrice is provided
+}, {
+  message: "Either sections with items OR defaultPrice must be provided for food package pricing"
 })
 
 const gstCalculationSchema = z.object({
